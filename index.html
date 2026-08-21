@@ -292,7 +292,7 @@
         })
     });
 
-    // 3.4 Sistema Viário
+    // 3.4 Sistema Viário (Estilo OSM com rotação de rótulo e largura real de 4 metros)
     const viarioSource = new ol.source.Vector({
         url: 'SISTEMA_VIARIO.geojson',
         format: new ol.format.GeoJSON({
@@ -301,12 +301,44 @@
         })
     });
 
+    function estiloSistemaViario(feature, resolution) {
+        // Converte 4 metros de terreno em pixels na escala atual
+        const larguraEmMetros = 4;
+        const larguraEmPixels = Math.max(larguraEmMetros / resolution, 3); // Mínimo de 3px para visibilidade em zooms distantes
+
+        // Obtém o nome da rua do atributo "NOME"
+        const nomeVia = feature.get('NOME') || '';
+
+        return [
+            // Camada 1: Borda da rua (Cinza escuro)
+            new ol.style.Style({
+                stroke: new ol.style.Stroke({
+                    color: '#666666',
+                    width: larguraEmPixels + 2
+                })
+            }),
+            // Camada 2: Pista de rolamento (Branco) + Rótulo com o atributo NOME
+            new ol.style.Style({
+                stroke: new ol.style.Stroke({
+                    color: '#ffffff',
+                    width: larguraEmPixels
+                }),
+                text: new ol.style.Text({
+                    text: String(nomeVia),
+                    font: 'bold 12px Arial, sans-serif',
+                    fill: new ol.style.Fill({ color: '#222222' }),
+                    stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 }),
+                    placement: 'line', // Acompanha o traçado da rua
+                    overflow: true
+                })
+            })
+        ];
+    }
+
     const viarioLayer = new ol.layer.Vector({
         source: viarioSource,
         visible: true,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#0055ff', width: 2 }) // Azul
-        })
+        style: estiloSistemaViario
     });
 
     // 4. Camada de Medição
@@ -432,12 +464,12 @@
         });
     });
 
-    // Identificação de feições via clique (Prioriza Lotes para abrir o Popup)
+    // Identificação de feições via clique
     map.on('singleclick', function (evt) {
         if (draw) return;
 
         const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, {
-            layerFilter: layer => layer === lotesLayer || layer === edificacoesLayer || layer === perimetroLayer
+            layerFilter: layer => layer === lotesLayer || layer === edificacoesLayer || layer === perimetroLayer || layer === viarioLayer
         });
 
         if (feature) {
