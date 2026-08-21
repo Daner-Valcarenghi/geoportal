@@ -20,6 +20,7 @@
             width: 100%; 
             height: 100%; 
             font-family: Arial, sans-serif; 
+            overflow: hidden;
         }
 
         #map { 
@@ -27,7 +28,7 @@
             height: 100%; 
         }
 
-        /* Estilo da janela de informações do lote */
+        /* Estilo do Popup */
         .ol-popup {
             position: absolute;
             background-color: #ffffff;
@@ -63,18 +64,50 @@
             font-weight: bold; 
         }
 
-        /* Painel principal de controle */
-        .map-menu {
+        /* Contêiner do Painel de Controle Recolhível */
+        .map-menu-container {
             position: absolute;
             top: 10px;
             right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .menu-toggle-btn {
+            background: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
+        }
+        .menu-toggle-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .map-menu {
             background: rgba(255, 255, 255, 0.95);
             padding: 12px 16px;
             border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             font-size: 13px;
             line-height: 1.5;
+            margin-top: 5px;
+            max-width: 240px;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Classe para recolher o menu */
+        .map-menu.collapsed {
+            display: none;
         }
         
         .menu-section {
@@ -96,22 +129,29 @@
         }
         .measure-btn:hover { background: #0056b3; }
 
-        /* Seta indicadora do Norte */
-        .north-arrow {
+        /* Seta Norte Clicável e Rotativa */
+        .north-arrow-btn {
             position: absolute;
             bottom: 35px;
             right: 10px;
             background: rgba(255, 255, 255, 0.9);
-            padding: 6px;
+            border: 1px solid #ccc;
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             z-index: 1000;
-            text-align: center;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: bold;
-            width: 24px;
-            height: 24px;
-            line-height: 24px;
+            font-size: 14px;
             user-select: none;
+            transition: transform 0.1s linear;
+        }
+        .north-arrow-btn:hover {
+            background: #ffffff;
         }
 
         /* Barra de Escala */
@@ -133,35 +173,42 @@
     <div id="popup-content"></div>
 </div>
 
-<!-- Indicador do Norte -->
-<div class="north-arrow" title="Norte Cartográfico">N ↑</div>
+<!-- Botão da Seta Norte (Interativo) -->
+<button id="btn-north" class="north-arrow-btn" title="Clique para reorientar para o Norte">N ↑</button>
 
-<!-- Gerenciador de Camadas e Medição -->
-<div class="map-menu">
-    <div>
-        <b>Camadas Vetoriais:</b><br>
-        <input type="checkbox" id="chk-lotes" checked>
-        <label for="chk-lotes">Lotes REURB</label>
-    </div>
+<!-- Gerenciador de Camadas e Medição (Recolhível) -->
+<div class="map-menu-container">
+    <button id="btn-toggle-menu" class="menu-toggle-btn">
+        <span>Camadas & Ferramentas</span>
+        <span id="toggle-icon">▼</span>
+    </button>
 
-    <div class="menu-section">
-        <b>Fundo de Mapa:</b><br>
-        <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
-        <label for="ortofoto">Ortofoto Municipal</label><br>
-        <input type="radio" id="osm" name="baseMap" value="osm">
-        <label for="osm">OpenStreetMap</label>
-    </div>
+    <div id="map-menu" class="map-menu">
+        <div>
+            <b>Camadas Vetoriais:</b><br>
+            <input type="checkbox" id="chk-lotes" checked>
+            <label for="chk-lotes">Lotes REURB</label>
+        </div>
 
-    <div class="menu-section">
-        <b>Ferramentas de Medição:</b><br>
-        <button id="btn-dist" class="measure-btn">Distância</button>
-        <button id="btn-area" class="measure-btn">Área</button>
-        <button id="btn-clear" class="measure-btn" style="background:#6c757d;">Limpar</button>
+        <div class="menu-section">
+            <b>Fundo de Mapa:</b><br>
+            <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
+            <label for="ortofoto">Ortofoto Municipal</label><br>
+            <input type="radio" id="osm" name="baseMap" value="osm">
+            <label for="osm">OpenStreetMap</label>
+        </div>
+
+        <div class="menu-section">
+            <b>Ferramentas de Medição:</b><br>
+            <button id="btn-dist" class="measure-btn">Distância</button>
+            <button id="btn-area" class="measure-btn">Área</button>
+            <button id="btn-clear" class="measure-btn" style="background:#6c757d;">Limpar</button>
+        </div>
     </div>
 </div>
 
 <script>
-    // 1. Definição do CRS SIRGAS 2000 (EPSG:4674)
+    // 1. Registro de CRS EPSG:4674 (SIRGAS 2000)
     proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
     ol.proj.proj4.register(proj4);
 
@@ -198,7 +245,7 @@
         })
     });
 
-    // 4. Camada para Desenho de Medições
+    // 4. Camada de Medição
     const measureSource = new ol.source.Vector();
     const measureLayer = new ol.layer.Vector({
         source: measureSource,
@@ -212,7 +259,7 @@
         })
     });
 
-    // 5. Configuração da Janela de Popup
+    // 5. Popup Overlay
     const popupContainer = document.getElementById('popup');
     const popupContent = document.getElementById('popup-content');
     const popupCloser = document.getElementById('popup-closer');
@@ -228,7 +275,7 @@
         return false;
     };
 
-    // 6. Configuração da Barra de Escala
+    // 6. Barra de Escala
     const scaleLineControl = new ol.control.ScaleLine({
         units: 'metric',
         bar: true,
@@ -237,34 +284,65 @@
         minWidth: 140
     });
 
-    // 7. Inicialização do Mapa
+    // 7. Mapa e Visão (Permite Rotação Livre)
+    const view = new ol.View({
+        center: ol.proj.fromLonLat([-55, -30]),
+        zoom: 5,
+        enableRotation: true
+    });
+
     const map = new ol.Map({
         target: 'map',
         controls: ol.control.defaults.defaults().extend([scaleLineControl]),
         layers: [osmLayer, ortofotoLayer, lotesLayer, measureLayer],
         overlays: [overlay],
-        view: new ol.View({
-            center: ol.proj.fromLonLat([-55, -30]),
-            zoom: 5
-        })
+        view: view
     });
 
-    // Enquadramento automático da extensão dos lotes
+    // Auto-fit nos lotes
     lotesSource.on('change', function () {
         if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
             map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
         }
     });
 
-    // 8. Evento de Ativação / Desativação da Camada de Lotes (Checkbox)
-    document.getElementById('chk-lotes').addEventListener('change', function (e) {
-        lotesLayer.setVisible(e.target.checked);
-        if (!e.target.checked) {
-            overlay.setPosition(undefined);
-        }
+    // 8. Rotação Dinâmica da Seta Norte e Reset de Orientação
+    const northBtn = document.getElementById('btn-north');
+
+    // Sincroniza rotação do elemento gráfico da seta com o ângulo da visão do mapa
+    view.on('change:rotation', function () {
+        const rotationRad = view.getRotation();
+        northBtn.style.transform = `rotate(${rotationRad}rad)`;
     });
 
-    // Alternador de Fundo de Mapa (Radio buttons)
+    // Ao clicar na seta Norte, faz animação suave de retorno ao Norte (0 radianos)
+    northBtn.onclick = function () {
+        view.animate({
+            rotation: 0,
+            duration: 350
+        });
+    };
+
+    // 9. Controle de Expansão/Recolhimento do Menu
+    const menuToggleBtn = document.getElementById('btn-toggle-menu');
+    const mapMenu = document.getElementById('map-menu');
+    const toggleIcon = document.getElementById('toggle-icon');
+
+    menuToggleBtn.onclick = function () {
+        mapMenu.classList.toggle('collapsed');
+        if (mapMenu.classList.contains('collapsed')) {
+            toggleIcon.textContent = '▲';
+        } else {
+            toggleIcon.textContent = '▼';
+        }
+    };
+
+    // 10. Alternância de Camadas e Medições
+    document.getElementById('chk-lotes').addEventListener('change', function (e) {
+        lotesLayer.setVisible(e.target.checked);
+        if (!e.target.checked) overlay.setPosition(undefined);
+    });
+
     document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
         elem.addEventListener('change', function (e) {
             osmLayer.setVisible(e.target.value === 'osm');
@@ -272,7 +350,7 @@
         });
     });
 
-    // 9. Identificação de Atributos via Clique
+    // Identificação de lotes via clique
     map.on('singleclick', function (evt) {
         if (draw) return;
         if (!lotesLayer.getVisible()) return;
@@ -299,7 +377,7 @@
         }
     });
 
-    // 10. Lógica das Ferramentas de Medição (Corrigida)
+    // Ferramenta de Desenho/Medição
     let draw;
 
     function addInteraction(type) {
