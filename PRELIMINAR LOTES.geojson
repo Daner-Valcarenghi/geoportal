@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "PRELIMINAR LOTES",
+"name": "PRELIMINAR_LOTES",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4674" } },
 "features": [
 { "type": "Feature", "properties": { "id": null, "NOME": null, "QUADRA": 897, "RUA": null, "ÁREA (m²": null, "PERÍMETRO": null, "TÍTULO H�": null }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -53.477804511683381, -30.503839649878355 ], [ -53.477549569637404, -30.503888290650139 ], [ -53.477573471331361, -30.503985801431377 ], [ -53.47782951248108, -30.503937020375169 ], [ -53.477804511683381, -30.503839649878355 ] ] ] ] } },
