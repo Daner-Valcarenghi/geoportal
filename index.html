@@ -8,13 +8,15 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-    <title>Meu Geoportal</title>
+    <title>Meu Geoportal - SIRGAS 2000</title>
 
     <!-- OpenLayers CDN -->
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
-
     <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
+
+    <!-- Proj4js (Necessário para dar suporte ao EPSG:4674 / SIRGAS 2000) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
 
@@ -41,6 +43,13 @@
 <script>
 
     // ==========================================
+    // REGISTRO DO EPSG:4674 (SIRGAS 2000)
+    // ==========================================
+    proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
+    ol.proj.proj4.register(proj4);
+
+
+    // ==========================================
     // MAPA BASE (OpenStreetMap)
     // ==========================================
 
@@ -50,7 +59,7 @@
 
 
     // ==========================================
-    // CAMADA DE LOTES (GeoJSON)
+    // CAMADA DE LOTES (GeoJSON em EPSG:4674)
     // ==========================================
 
     const lotesSource = new ol.source.Vector({
@@ -59,23 +68,23 @@
 
         format: new ol.format.GeoJSON({
 
-            dataProjection: 'EPSG:4326',   // Projeção do GeoJSON original
+            dataProjection: 'EPSG:4674',   // Projeção real do seu arquivo (SIRGAS 2000)
 
-            featureProjection: 'EPSG:3857' // Projeção da exibição do mapa
+            featureProjection: 'EPSG:3857' // Projeção do mapa
 
         })
 
     });
 
 
-    // Estilo dos Polígonos
+    // Estilo dos Lotes
     const lotesStyle = new ol.style.Style({
         stroke: new ol.style.Stroke({
-            color: '#ff0000', // Vermelho para destaque
+            color: '#0055ff', // Azul
             width: 2
         }),
         fill: new ol.style.Fill({
-            color: 'rgba(255, 0, 0, 0.25)'
+            color: 'rgba(0, 85, 255, 0.25)'
         })
     });
 
@@ -120,7 +129,7 @@
 
 
     // ==========================================
-    // ENQUADRAR AUTOMATICAMENTE (COM VERIFICAÇÃO)
+    // ENQUADRAR AUTOMATICAMENTE NOS LOTES
     // ==========================================
 
     lotesSource.on('change', function () {
@@ -141,18 +150,17 @@
                     duration: 1000
                 });
 
-                console.log(`Sucesso: ${features.length} feições carregadas.`);
+                console.log(`Sucesso: ${features.length} feições carregadas com EPSG:4674.`);
 
             } else {
 
-                console.warn('O arquivo GeoJSON foi lido, mas não contém polígonos válidos ou está vazio.');
+                console.warn('O arquivo GeoJSON foi lido, mas não foram encontradas feições válidas.');
 
             }
 
         } else if (state === 'error') {
 
-            console.error('ERRO: Não foi possível carregar o arquivo "PRELIMINAR_LOTES.geojson".');
-            console.error('Certifique-se de estar usando um Servidor Local (ex: Live Server do VS Code) e de que o arquivo está na mesma pasta do código HTML.');
+            console.error('ERRO: Falha ao carregar "PRELIMINAR_LOTES.geojson". Certifique-se de executar via servidor HTTP (ex: Live Server).');
 
         }
 
