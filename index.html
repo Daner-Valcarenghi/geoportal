@@ -10,7 +10,7 @@
 
     <title>Meu Geoportal</title>
 
-    <!-- OpenLayers -->
+    <!-- OpenLayers CDN -->
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
 
@@ -41,7 +41,7 @@
 <script>
 
     // ==========================================
-    // MAPA BASE
+    // MAPA BASE (OpenStreetMap)
     // ==========================================
 
     const baseMap = new ol.layer.Tile({
@@ -50,7 +50,7 @@
 
 
     // ==========================================
-    // CAMADA DE LOTES (Sem espaço no nome do arquivo)
+    // CAMADA DE LOTES (GeoJSON)
     // ==========================================
 
     const lotesSource = new ol.source.Vector({
@@ -59,23 +59,23 @@
 
         format: new ol.format.GeoJSON({
 
-            dataProjection: 'EPSG:4326',
+            dataProjection: 'EPSG:4326',   // Projeção do GeoJSON original
 
-            featureProjection: 'EPSG:3857'
+            featureProjection: 'EPSG:3857' // Projeção da exibição do mapa
 
         })
 
     });
 
 
-    // Estilo básico para visualização dos polígonos
+    // Estilo dos Polígonos
     const lotesStyle = new ol.style.Style({
         stroke: new ol.style.Stroke({
-            color: '#0055ff',
+            color: '#ff0000', // Vermelho para destaque
             width: 2
         }),
         fill: new ol.style.Fill({
-            color: 'rgba(0, 85, 255, 0.2)'
+            color: 'rgba(255, 0, 0, 0.25)'
         })
     });
 
@@ -120,32 +120,39 @@
 
 
     // ==========================================
-    // ENQUADRAR AUTOMATICAMENTE OS LOTES
+    // ENQUADRAR AUTOMATICAMENTE (COM VERIFICAÇÃO)
     // ==========================================
 
     lotesSource.on('change', function () {
 
         const state = lotesSource.getState();
 
-        if (state === 'ready' && lotesSource.getFeatures().length > 0) {
+        if (state === 'ready') {
 
-            const extent = lotesSource.getExtent();
+            const features = lotesSource.getFeatures();
 
-            map.getView().fit(
+            if (features.length > 0) {
 
-                extent,
+                const extent = lotesSource.getExtent();
 
-                {
+                map.getView().fit(extent, {
                     padding: [50, 50, 50, 50],
                     maxZoom: 18,
                     duration: 1000
-                }
+                });
 
-            );
+                console.log(`Sucesso: ${features.length} feições carregadas.`);
+
+            } else {
+
+                console.warn('O arquivo GeoJSON foi lido, mas não contém polígonos válidos ou está vazio.');
+
+            }
 
         } else if (state === 'error') {
 
-            console.error('Erro ao carregar o arquivo GeoJSON. Verifique se o nome "PRELIMINAR_LOTES.geojson" está correto na pasta e se a página está rodando em um servidor HTTP (ex: Live Server).');
+            console.error('ERRO: Não foi possível carregar o arquivo "PRELIMINAR_LOTES.geojson".');
+            console.error('Certifique-se de estar usando um Servidor Local (ex: Live Server do VS Code) e de que o arquivo está na mesma pasta do código HTML.');
 
         }
 
