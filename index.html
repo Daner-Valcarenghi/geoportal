@@ -186,8 +186,17 @@
     <div id="map-menu" class="map-menu">
         <div>
             <b>Camadas Vetoriais:</b><br>
+            <input type="checkbox" id="chk-perimetro" checked>
+            <label for="chk-perimetro">Perímetro do Núcleo</label><br>
+
             <input type="checkbox" id="chk-lotes" checked>
-            <label for="chk-lotes">Lotes REURB</label>
+            <label for="chk-lotes">Lotes REURB</label><br>
+
+            <input type="checkbox" id="chk-edificacoes" checked>
+            <label for="chk-edificacoes">Edificações</label><br>
+
+            <input type="checkbox" id="chk-viario" checked>
+            <label for="chk-viario">Sistema Viário</label>
         </div>
 
         <div class="menu-section">
@@ -227,7 +236,27 @@
         visible: true
     });
 
-    // 3. Camada Vetorial dos Lotes
+    // 3. Camadas Vetoriais
+
+    // 3.1 Perímetro do Núcleo (Linha tracejada destacada)
+    const perimetroSource = new ol.source.Vector({
+        url: 'PERÍMETRO_DO_NÚCLEO.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    const perimetroLayer = new ol.layer.Vector({
+        source: perimetroSource,
+        visible: true,
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#ff8c00', width: 3, lineDash: [6, 6] }), // Laranja pontilhado
+            fill: new ol.style.Fill({ color: 'rgba(255, 140, 0, 0.05)' })
+        })
+    });
+
+    // 3.2 Lotes
     const lotesSource = new ol.source.Vector({
         url: 'PRELIMINAR_LOTES.geojson',
         format: new ol.format.GeoJSON({
@@ -240,8 +269,43 @@
         source: lotesSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }),
+            stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }), // Vermelho
             fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.15)' })
+        })
+    });
+
+    // 3.3 Edificações
+    const edificacoesSource = new ol.source.Vector({
+        url: 'EDIFICACOES.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    const edificacoesLayer = new ol.layer.Vector({
+        source: edificacoesSource,
+        visible: true,
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#800080', width: 1.5 }), // Roxo
+            fill: new ol.style.Fill({ color: 'rgba(128, 0, 128, 0.3)' })
+        })
+    });
+
+    // 3.4 Sistema Viário
+    const viarioSource = new ol.source.Vector({
+        url: 'SISTEMA_VIARIO.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    const viarioLayer = new ol.layer.Vector({
+        source: viarioSource,
+        visible: true,
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#0055ff', width: 2 }) // Azul
         })
     });
 
@@ -294,12 +358,20 @@
     const map = new ol.Map({
         target: 'map',
         controls: ol.control.defaults.defaults().extend([scaleLineControl]),
-        layers: [osmLayer, ortofotoLayer, lotesLayer, measureLayer],
+        layers: [
+            osmLayer, 
+            ortofotoLayer, 
+            perimetroLayer, 
+            lotesLayer, 
+            edificacoesLayer, 
+            viarioLayer, 
+            measureLayer
+        ],
         overlays: [overlay],
         view: view
     });
 
-    // Auto-fit nos lotes
+    // Auto-fit nos lotes assim que carregados
     lotesSource.on('change', function () {
         if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
             map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
@@ -309,13 +381,11 @@
     // 8. Rotação Dinâmica da Seta Norte e Reset de Orientação
     const northBtn = document.getElementById('btn-north');
 
-    // Sincroniza rotação do elemento gráfico da seta com o ângulo da visão do mapa
     view.on('change:rotation', function () {
         const rotationRad = view.getRotation();
         northBtn.style.transform = `rotate(${rotationRad}rad)`;
     });
 
-    // Ao clicar na seta Norte, faz animação suave de retorno ao Norte (0 radianos)
     northBtn.onclick = function () {
         view.animate({
             rotation: 0,
@@ -338,9 +408,21 @@
     };
 
     // 10. Alternância de Camadas e Medições
+    document.getElementById('chk-perimetro').addEventListener('change', function (e) {
+        perimetroLayer.setVisible(e.target.checked);
+    });
+
     document.getElementById('chk-lotes').addEventListener('change', function (e) {
         lotesLayer.setVisible(e.target.checked);
         if (!e.target.checked) overlay.setPosition(undefined);
+    });
+
+    document.getElementById('chk-edificacoes').addEventListener('change', function (e) {
+        edificacoesLayer.setVisible(e.target.checked);
+    });
+
+    document.getElementById('chk-viario').addEventListener('change', function (e) {
+        viarioLayer.setVisible(e.target.checked);
     });
 
     document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
@@ -350,18 +432,17 @@
         });
     });
 
-    // Identificação de lotes via clique
+    // Identificação de feições via clique (Prioriza Lotes para abrir o Popup)
     map.on('singleclick', function (evt) {
         if (draw) return;
-        if (!lotesLayer.getVisible()) return;
 
         const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, {
-            layerFilter: layer => layer === lotesLayer
+            layerFilter: layer => layer === lotesLayer || layer === edificacoesLayer || layer === perimetroLayer
         });
 
         if (feature) {
             const properties = feature.getProperties();
-            let htmlContent = '<h4 style="margin:0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left:15px; margin:0;">';
+            let htmlContent = '<h4 style="margin:0 0 8px 0;">Atributos do Elemento</h4><ul style="padding-left:15px; margin:0;">';
 
             for (let prop in properties) {
                 if (prop !== 'geometry') {
