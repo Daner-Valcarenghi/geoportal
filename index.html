@@ -2,172 +2,179 @@
 <html lang="pt-BR">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>Meu Geoportal - SIRGAS 2000</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Geoportal Interativo</title>
 
     <!-- OpenLayers CDN -->
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
     <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
 
-    <!-- Proj4js (Necessário para dar suporte ao EPSG:4674 / SIRGAS 2000) -->
+    <!-- Proj4js (EPSG:4674) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 100%; }
 
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+        /* Estilo do Popup */
+        .ol-popup {
+            position: absolute;
+            background-color: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #cccccc;
+            bottom: 12px;
+            left: -50px;
+            min-width: 200px;
         }
-
-        #map {
-            width: 100%;
-            height: 100%;
+        .ol-popup:after, .ol-popup:before {
+            top: 100%;
+            border: solid transparent;
+            content: " ";
+            height: 0;
+            width: 0;
+            position: absolute;
+            pointer-events: none;
         }
+        .ol-popup:after { border-top-color: white; border-width: 10px; left: 48px; margin-left: -10px; }
+        .ol-popup-closer { text-decoration: none; position: absolute; top: 2px; right: 8px; color: #999; font-weight: bold; }
 
+        /* Controles flutuantes */
+        .map-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
     </style>
-
 </head>
 
 <body>
 
 <div id="map"></div>
 
-<script>
+<!-- Elemento do Popup -->
+<div id="popup" class="ol-popup">
+    <a href="#" id="popup-closer" class="ol-popup-closer">✕</a>
+    <div id="popup-content"></div>
+</div>
 
-    // ==========================================
-    // REGISTRO DO EPSG:4674 (SIRGAS 2000)
-    // ==========================================
+<!-- Menu de Controle de Camadas -->
+<div class="map-menu">
+    <label><b>Mapa Base:</b></label><br>
+    <input type="radio" id="osm" name="baseMap" value="osm" checked>
+    <label for="osm">OpenStreetMap</label><br>
+    <input type="radio" id="satellite" name="baseMap" value="satellite">
+    <label for="satellite">Satélite (Esri)</label>
+</div>
+
+<script>
+    // 1. Projeção SIRGAS 2000
     proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
     ol.proj.proj4.register(proj4);
 
-
-    // ==========================================
-    // MAPA BASE (OpenStreetMap)
-    // ==========================================
-
-    const baseMap = new ol.layer.Tile({
-        source: new ol.source.OSM()
+    // 2. Mapas Base
+    const osmLayer = new ol.layer.Tile({
+        source: new ol.source.OSM(),
+        visible: true
     });
 
-
-    // ==========================================
-    // CAMADA DE LOTES (GeoJSON em EPSG:4674)
-    // ==========================================
-
-    const lotesSource = new ol.source.Vector({
-
-        url: 'PRELIMINAR_LOTES.geojson',
-
-        format: new ol.format.GeoJSON({
-
-            dataProjection: 'EPSG:4674',   // Projeção real do seu arquivo (SIRGAS 2000)
-
-            featureProjection: 'EPSG:3857' // Projeção do mapa
-
-        })
-
-    });
-
-
-    // Estilo dos Lotes
-    const lotesStyle = new ol.style.Style({
-        stroke: new ol.style.Stroke({
-            color: '#0055ff', // Azul
-            width: 2
+    const satLayer = new ol.layer.Tile({
+        source: new ol.source.XYZ({
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            maxZoom: 19
         }),
-        fill: new ol.style.Fill({
-            color: 'rgba(0, 85, 255, 0.25)'
+        visible: false
+    });
+
+    // 3. Camada de Lotes
+    const lotesSource = new ol.source.Vector({
+        url: 'PRELIMINAR_LOTES.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
         })
     });
 
-
-    const lotes = new ol.layer.Vector({
-
+    const lotesLayer = new ol.layer.Vector({
         source: lotesSource,
-
-        style: lotesStyle
-
-    });
-
-
-    // ==========================================
-    // CRIAÇÃO DO MAPA
-    // ==========================================
-
-    const map = new ol.Map({
-
-        target: 'map',
-
-        layers: [
-
-            baseMap,
-
-            lotes
-
-        ],
-
-        view: new ol.View({
-
-            center: ol.proj.fromLonLat([
-                -55,
-                -30
-            ]),
-
-            zoom: 5
-
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#ffcc00', width: 2 }),
+            fill: new ol.style.Fill({ color: 'rgba(255, 204, 0, 0.3)' })
         })
-
     });
 
+    // 4. Configuração do Popup Overlay
+    const popupContainer = document.getElementById('popup');
+    const popupContent = document.getElementById('popup-content');
+    const popupCloser = document.getElementById('popup-closer');
 
-    // ==========================================
-    // ENQUADRAR AUTOMATICAMENTE NOS LOTES
-    // ==========================================
+    const overlay = new ol.Overlay({
+        element: popupContainer,
+        autoPan: { animation: { duration: 250 } }
+    });
 
+    popupCloser.onclick = function () {
+        overlay.setPosition(undefined);
+        popupCloser.blur();
+        return false;
+    };
+
+    // 5. Inicialização do Mapa
+    const map = new ol.Map({
+        target: 'map',
+        layers: [osmLayer, satLayer, lotesLayer],
+        overlays: [overlay],
+        view: new ol.View({
+            center: ol.proj.fromLonLat([-55, -30]),
+            zoom: 5
+        })
+    });
+
+    // Fit nos Lotes
     lotesSource.on('change', function () {
-
-        const state = lotesSource.getState();
-
-        if (state === 'ready') {
-
-            const features = lotesSource.getFeatures();
-
-            if (features.length > 0) {
-
-                const extent = lotesSource.getExtent();
-
-                map.getView().fit(extent, {
-                    padding: [50, 50, 50, 50],
-                    maxZoom: 18,
-                    duration: 1000
-                });
-
-                console.log(`Sucesso: ${features.length} feições carregadas com EPSG:4674.`);
-
-            } else {
-
-                console.warn('O arquivo GeoJSON foi lido, mas não foram encontradas feições válidas.');
-
-            }
-
-        } else if (state === 'error') {
-
-            console.error('ERRO: Falha ao carregar "PRELIMINAR_LOTES.geojson". Certifique-se de executar via servidor HTTP (ex: Live Server).');
-
+        if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
+            map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
         }
-
     });
 
+    // 6. Clique para exibir Popup com Atributos
+    map.on('singleclick', function (evt) {
+        const feature = map.forEachFeatureAtPixel(evt.pixel, f => f);
+
+        if (feature) {
+            const properties = feature.getProperties();
+            let htmlContent = '<h4>Informações do Lote</h4><ul>';
+
+            // Percorre as propriedades ignorando a geometria
+            for (let prop in properties) {
+                if (prop !== 'geometry') {
+                    htmlContent += `<li><b>${prop}:</b> ${properties[prop]}</li>`;
+                }
+            }
+            htmlContent += '</ul>';
+
+            popupContent.innerHTML = htmlContent;
+            overlay.setPosition(evt.coordinate);
+        } else {
+            overlay.setPosition(undefined);
+        }
+    });
+
+    // 7. Alternar Camadas Base
+    document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
+        elem.addEventListener('change', function (e) {
+            osmLayer.setVisible(e.target.value === 'osm');
+            satLayer.setVisible(e.target.value === 'satellite');
+        });
+    });
 </script>
 
 </body>
-
 </html>
