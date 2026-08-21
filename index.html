@@ -2,8 +2,11 @@
 <html lang="pt-BR">
 
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <title>Meu Geoportal</title>
 
@@ -33,49 +36,96 @@
 
 <body>
 
-    <div id="map"></div>
+<div id="map"></div>
 
-    <script>
+<script>
 
-        // Mapa base
-        const baseMap = new ol.layer.Tile({
-            source: new ol.source.OSM()
-        });
+    // ==========================================
+    // MAPA BASE
+    // ==========================================
 
-
-        // Camada GeoJSON
-        const lotes = new ol.layer.Vector({
-            source: new ol.source.Vector({
-                url: 'PRELIMINAR%20LOTES.geojson',
-                format: new ol.format.GeoJSON()
-            })
-        });
+    const baseMap = new ol.layer.Tile({
+        source: new ol.source.OSM()
+    });
 
 
-        // Criar o mapa
-        const map = new ol.Map({
+    // ==========================================
+    // CAMADA DE LOTES
+    // ==========================================
 
-            target: 'map',
+    const lotesSource = new ol.source.Vector({
 
-            layers: [
-                baseMap,
-                lotes
-            ],
+        url: 'PRELIMINAR%20LOTES.geojson',
 
-            view: new ol.View({
+        format: new ol.format.GeoJSON()
 
-                center: ol.proj.fromLonLat([
-                    -55.0,
-                    -30.0
-                ]),
+    });
 
-                zoom: 10
 
-            })
+    const lotes = new ol.layer.Vector({
 
-        });
+        source: lotesSource
 
-    </script>
+    });
+
+
+    // ==========================================
+    // CRIAÇÃO DO MAPA
+    // ==========================================
+
+    const map = new ol.Map({
+
+        target: 'map',
+
+        layers: [
+
+            baseMap,
+
+            lotes
+
+        ],
+
+        view: new ol.View({
+
+            center: ol.proj.fromLonLat([
+                -55,
+                -30
+            ]),
+
+            zoom: 5
+
+        })
+
+    });
+
+
+    // ==========================================
+    // ENQUADRAR AUTOMATICAMENTE OS LOTES
+    // ==========================================
+
+    lotesSource.once('change', function () {
+
+        if (lotesSource.getState() === 'ready') {
+
+            const extent = lotesSource.getExtent();
+
+            map.getView().fit(
+
+                extent,
+
+                {
+                    padding: [50, 50, 50, 50],
+                    maxZoom: 18,
+                    duration: 1000
+                }
+
+            );
+
+        }
+
+    });
+
+</script>
 
 </body>
 
