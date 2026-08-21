@@ -208,6 +208,397 @@
             ortofotoLayer.setVisible(e.target.value === 'ortofoto');
         });
     });
+    <!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geoportal REURB - Ortofoto Municipal</title>
+
+    <!-- OpenLayers CSS/JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
+
+    <!-- Proj4js (EPSG:4674 - SIRGAS 2000) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
+
+    <!-- ol-ext (Biblioteca de Extensões do OpenLayers para Seta Norte) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.23/dist/ol-ext.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol-ext@4.0.23/dist/ol-ext.min.js"></script>
+
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            font-family: Arial, sans-serif; 
+        }
+
+        #map { 
+            width: 100%; 
+            height: 100%; 
+        }
+
+        /* Estilo do Popup */
+        .ol-popup {
+            position: absolute;
+            background-color: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #cccccc;
+            bottom: 12px;
+            left: -50px;
+            min-width: 220px;
+        }
+        .ol-popup:after, .ol-popup:before {
+            top: 100%; 
+            border: solid transparent; 
+            content: " ";
+            height: 0; 
+            width: 0; 
+            position: absolute; 
+            pointer-events: none;
+        }
+        .ol-popup:after { 
+            border-top-color: white; 
+            border-width: 10px; 
+            left: 48px; 
+            margin-left: -10px; 
+        }
+        .ol-popup-closer { 
+            text-decoration: none; 
+            position: absolute; 
+            top: 2px; 
+            right: 8px; 
+            color: #999; 
+            font-weight: bold; 
+        }
+
+        /* Menu de controle de camadas */
+        .map-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        /* Estilização da Barra de Escala */
+        .ol-scale-line {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 4px;
+            padding: 2px 5px;
+            bottom: 10px;
+            left: 10px;
+        }
+        .ol-scale-line-inner {
+            border: 2px solid #333;
+            border-top: none;
+            color: #000;
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        /* Painel da Ferramenta de Medição */
+        .measure-tools {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #ddd;
+        }
+        .measure-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 4px;
+        }
+        .measure-btn:hover {
+            background: #0056b3;
+        }
+        .measure-btn.active {
+            background: #dc3545;
+        }
+
+        /* Estilo dos Rótulos de Medição no Mapa */
+        .ol-tooltip {
+            position: relative;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 4px;
+            color: white;
+            padding: 4px 8px;
+            opacity: 0.85;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .ol-tooltip-measure {
+            opacity: 1;
+            font-weight: bold;
+        }
+        .ol-tooltip-static {
+            background-color: #ffcc33;
+            color: black;
+            border: 1px solid white;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<!-- Elemento HTML do Popup -->
+<div id="popup" class="ol-popup">
+    <a href="#" id="popup-closer" class="ol-popup-closer">✕</a>
+    <div id="popup-content"></div>
+</div>
+
+<!-- Menu do Mapa com Medição e Camadas -->
+<div class="map-menu">
+    <label><b>Fundo de Mapa:</b></label><br>
+    <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
+    <label for="ortofoto">Ortofoto Municipal</label><br>
+    <input type="radio" id="osm" name="baseMap" value="osm">
+    <label for="osm">OpenStreetMap</label>
+
+    <div class="measure-tools">
+        <label><b>Medição:</b></label><br>
+        <button id="btn-dist" class="measure-btn">Distância</button>
+        <button id="btn-area" class="measure-btn">Área</button>
+        <button id="btn-clear" class="measure-btn" style="background:#6c757d;">Limpar</button>
+    </div>
+</div>
+
+<script>
+    // 1. Registro SIRGAS 2000 (EPSG:4674)
+    proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
+    ol.proj.proj4.register(proj4);
+
+    // 2. Camadas
+    const osmLayer = new ol.layer.Tile({
+        source: new ol.source.OSM(),
+        visible: false
+    });
+
+    const ortofotoLayer = new ol.layer.Tile({
+        source: new ol.source.XYZ({
+            url: 'ortofoto_tiles/{z}/{x}/{y}.png',
+            maxZoom: 21,
+            attributions: 'Ortofoto © Prefeitura Municipal'
+        }),
+        visible: true
+    });
+
+    const lotesSource = new ol.source.Vector({
+        url: 'PRELIMINAR_LOTES.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    const lotesLayer = new ol.layer.Vector({
+        source: lotesSource,
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }),
+            fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.15)' })
+        })
+    });
+
+    // Camada Vetorial dedicada a desenhar as medições
+    const measureSource = new ol.source.Vector();
+    const measureLayer = new ol.layer.Vector({
+        source: measureSource,
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
+            stroke: new ol.style.Stroke({ color: '#ffcc33', width: 3 }),
+            image: new ol.style.Circle({
+                radius: 6,
+                fill: new ol.style.Fill({ color: '#ffcc33' })
+            })
+        })
+    });
+
+    // 3. Popup
+    const popupContainer = document.getElementById('popup');
+    const popupContent = document.getElementById('popup-content');
+    const popupCloser = document.getElementById('popup-closer');
+
+    const overlay = new ol.Overlay({
+        element: popupContainer,
+        autoPan: { animation: { duration: 250 } }
+    });
+
+    popupCloser.onclick = function () {
+        overlay.setPosition(undefined);
+        popupCloser.blur();
+        return false;
+    };
+
+    // 4. Inicialização do Mapa
+    const map = new ol.Map({
+        target: 'map',
+        layers: [osmLayer, ortofotoLayer, lotesLayer, measureLayer],
+        overlays: [overlay],
+        view: new ol.View({
+            center: ol.proj.fromLonLat([-55, -30]),
+            zoom: 5
+        })
+    });
+
+    // 5. Adicionar Barra de Escala (Escala gráfica)
+    const scaleLineControl = new ol.control.ScaleLine({
+        units: 'metric',
+        bar: false,
+        steps: 4,
+        text: true,
+        minWidth: 100
+    });
+    map.addControl(scaleLineControl);
+
+    // 6. Adicionar Seta Norte (Usando ol-ext)
+    const compass = new ol.control.Compass({
+        className: 'ol-compass',
+        style: new ol.style.Style({
+            image: new ol.style.Icon({
+                src: 'https://cdn.jsdelivr.net/npm/ol-ext@4.0.23/dist/img/compass.png',
+                scale: 0.7
+            })
+        })
+    });
+    map.addControl(compass);
+
+    // Enquadramento nos Lotes
+    lotesSource.on('change', function () {
+        if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
+            map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+        }
+    });
+
+    // Clique para atributos
+    map.on('singleclick', function (evt) {
+        if (draw) return; // Não abre popup durante medição
+
+        const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, {
+            layerFilter: layer => layer === lotesLayer
+        });
+
+        if (feature) {
+            const properties = feature.getProperties();
+            let htmlContent = '<h4 style="margin:0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left:15px; margin:0;">';
+
+            for (let prop in properties) {
+                if (prop !== 'geometry') {
+                    htmlContent += `<li><b>${prop}:</b> ${properties[prop]}</li>`;
+                }
+            }
+            htmlContent += '</ul>';
+
+            popupContent.innerHTML = htmlContent;
+            overlay.setPosition(evt.coordinate);
+        } else {
+            overlay.setPosition(undefined);
+        }
+    });
+
+    // Alternador de Camadas
+    document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
+        elem.addEventListener('change', function (e) {
+            osmLayer.setVisible(e.target.value === 'osm');
+            ortofotoLayer.setVisible(e.target.value === 'ortofoto');
+        });
+    });
+
+    // 7. Lógica da Ferramenta de Medição (Distância e Área)
+    let draw;
+    let helpTooltipElement;
+    let helpTooltip;
+    let measureTooltipElement;
+    let measureTooltip;
+
+    function addInteraction(type) {
+        map.removeInteraction(draw);
+
+        draw = new ol.interaction.Draw({
+            source: measureSource,
+            type: type,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
+                stroke: new ol.style.Stroke({ color: 'rgba(0, 0, 0, 0.5)', lineDash: [10, 10], width: 2 }),
+                image: new ol.style.Circle({
+                    radius: 5,
+                    stroke: new ol.style.Stroke({ color: 'rgba(0, 0, 0, 0.7)' }),
+                    fill:Para adicionar a barra de escala, o indicador de Norte e as ferramentas de medição (distância e área), basta incorporar os controles e componentes nativos do OpenLayers no seu script.
+
+---
+
+### 1. Elementos para Inserir no `index.html`
+
+Adicione os botões e estilos necessários para a barra de ferramentas de medição e para a seta de Norte:
+
+```html
+<!-- Adicionar dentro da tag <head> (Estilos dos novos controles) -->
+<style>
+    /* Estilo para a barra de medição */
+    .measure-menu {
+        position: absolute;
+        top: 10px;
+        left: 50px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 8px 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        z-index: 1000;
+    }
+    .measure-menu button {
+        margin-right: 5px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+
+    /* Estilo para a Seta Norte */
+    .north-arrow {
+        position: absolute;
+        bottom: 30px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        z-index: 1000;
+        text-align: center;
+        font-weight: bold;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+    }
+
+    /* Ajuste da Barra de Escala do OpenLayers */
+    .ol-scale-line {
+        left: 10px !important;
+        bottom: 10px !important;
+        background: rgba(0, 60, 136, 0.7) !important;
+    }
+</style>
+
+<!-- Adicionar dentro da tag <body> (Interface do usuário) -->
+<div class="measure-menu">
+    <b>Medir:</b>
+    <button id="measure-len">Distância</button>
+    <button id="measure-area">Área</button>
+    <button id="clear-measure">Limpar</button>
+</div>
+
+<div class="north-arrow" title="Norte">N ↑</div>
 </script>
 
 </body>
