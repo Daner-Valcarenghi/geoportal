@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geoportal REURB - Ortofoto Municipal</title>
 
-    <!-- OpenLayers CDN -->
+    <!-- OpenLayers CSS/JS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
     <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
 
@@ -27,7 +27,7 @@
             height: 100%; 
         }
 
-        /* Estilo do Popup */
+        /* Estilo do Popup dos Lotes */
         .ol-popup {
             position: absolute;
             background-color: white;
@@ -63,7 +63,7 @@
             font-weight: bold; 
         }
 
-        /* Menu de controle de camadas */
+        /* Menu de Painel de Camadas e Ferramentas */
         .map-menu {
             position: absolute;
             top: 10px;
@@ -73,9 +73,67 @@
             border-radius: 6px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             z-index: 1000;
+            font-size: 13px;
         }
-        .map-menu label {
+
+        .measure-tools {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .measure-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
+            margin-right: 4px;
+            margin-top: 5px;
+        }
+        .measure-btn:hover { background: #0056b3; }
+
+        /* Seta Norte */
+        .north-arrow {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 6px 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Estilo para Rótulos das Medições */
+        .ol-tooltip {
+            position: relative;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 4px;
+            color: white;
+            padding: 4px 8px;
+            opacity: 0.85;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .ol-tooltip-measure { opacity: 1; font-weight: bold; }
+        .ol-tooltip-static { background-color: #ffcc33; color: black; border: 1px solid white; }
+
+        /* Ajuste na Barra de Escala */
+        .ol-scale-line {
+            background: rgba(255, 255, 255, 0.85) !important;
+            border-radius: 4px;
+            padding: 2px 5px;
+        }
+        .ol-scale-line-inner {
+            border: 2px solid #333 !important;
+            border-top: none !important;
+            color: #000 !important;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -84,33 +142,46 @@
 
 <div id="map"></div>
 
-<!-- Elemento HTML do Popup -->
+<!-- Elemento Popup -->
 <div id="popup" class="ol-popup">
     <a href="#" id="popup-closer" class="ol-popup-closer">✕</a>
     <div id="popup-content"></div>
 </div>
 
-<!-- Menu para alternar mapa de fundo -->
+<!-- Seta Norte -->
+<div class="north-arrow" title="Norte Cartográfico">N ↑</div>
+
+<!-- Menu de Controle de Camadas (Checkboxes) e Medição -->
 <div class="map-menu">
-    <label><b>Fundo de Mapa:</b></label><br>
-    <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
-    <label for="ortofoto">Ortofoto Municipal</label><br>
-    <input type="radio" id="osm" name="baseMap" value="osm">
-    <label for="osm">OpenStreetMap</label>
+    <label><b>Camadas do Mapa:</b></label><br>
+    <input type="checkbox" id="chk-ortofoto" checked>
+    <label for="chk-ortofoto">Ortofoto Municipal</label><br>
+
+    <input type="checkbox" id="chk-lotes" checked>
+    <label for="chk-lotes">Lotes (REURB)</label><br>
+
+    <input type="checkbox" id="chk-osm">
+    <label for="chk-osm">OpenStreetMap Base</label>
+
+    <div class="measure-tools">
+        <label><b>Medição em Tempo Real:</b></label><br>
+        <button id="btn-dist" class="measure-btn">Distância</button>
+        <button id="btn-area" class="measure-btn">Área</button>
+        <button id="btn-clear" class="measure-btn" style="background:#6c757d;">Limpar</button>
+    </div>
 </div>
 
 <script>
-    // 1. Registro do Sistema de Referência SIRGAS 2000 (EPSG:4674)
+    // 1. Definição do Sistema de Referência SIRGAS 2000 (EPSG:4674)
     proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
     ol.proj.proj4.register(proj4);
 
-    // 2. Camada Mapa Base - OpenStreetMap (Desativada por padrão)
+    // 2. Definindo as Camadas
     const osmLayer = new ol.layer.Tile({
         source: new ol.source.OSM(),
         visible: false
     });
 
-    // 3. Camada Mapa Base - Ortofoto Municipal (Pasta de Tiles XYZ enviada via GitHub Desktop)
     const ortofotoLayer = new ol.layer.Tile({
         source: new ol.source.XYZ({
             url: 'ortofoto_tiles/{z}/{x}/{y}.png',
@@ -120,7 +191,6 @@
         visible: true
     });
 
-    // 4. Camada Vetorial - Lotes da REURB (GeoJSON em SIRGAS 2000)
     const lotesSource = new ol.source.Vector({
         url: 'PRELIMINAR_LOTES.geojson',
         format: new ol.format.GeoJSON({
@@ -131,18 +201,27 @@
 
     const lotesLayer = new ol.layer.Vector({
         source: lotesSource,
+        visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ 
-                color: '#ff0000', 
-                width: 2 
-            }),
-            fill: new ol.style.Fill({ 
-                color: 'rgba(255, 0, 0, 0.15)' 
+            stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }),
+            fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.15)' })
+        })
+    });
+
+    const measureSource = new ol.source.Vector();
+    const measureLayer = new ol.layer.Vector({
+        source: measureSource,
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
+            stroke: new ol.style.Stroke({ color: '#ffcc33', width: 3 }),
+            image: new ol.style.Circle({
+                radius: 6,
+                fill: new ol.style.Fill({ color: '#ffcc33' })
             })
         })
     });
 
-    // 5. Configuração da Janela Popup
+    // 3. Configuração do Popup
     const popupContainer = document.getElementById('popup');
     const popupContent = document.getElementById('popup-content');
     const popupCloser = document.getElementById('popup-closer');
@@ -158,10 +237,16 @@
         return false;
     };
 
-    // 6. Inicialização do Mapa
+    // 4. Inicialização do Mapa com Barra de Escala Gráfica
+    const scaleLineControl = new ol.control.ScaleLine({
+        units: 'metric',
+        minWidth: 100
+    });
+
     const map = new ol.Map({
         target: 'map',
-        layers: [osmLayer, ortofotoLayer, lotesLayer],
+        controls: ol.control.defaults.defaults().extend([scaleLineControl]),
+        layers: [osmLayer, ortofotoLayer, lotesLayer, measureLayer],
         overlays: [overlay],
         view: new ol.View({
             center: ol.proj.fromLonLat([-55, -30]),
@@ -169,23 +254,37 @@
         })
     });
 
-    // Ajuste automático da extensão do mapa ao carregar a camada de lotes
+    // Enquadramento automático na extensão dos lotes
     lotesSource.on('change', function () {
         if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
-            map.getView().fit(lotesSource.getExtent(), { 
-                padding: [50, 50, 50, 50], 
-                duration: 1000 
-            });
+            map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
         }
     });
 
-    // Consulta de Atributos ao clicar no lote
+    // 5. Ativar/Desativar Camadas (Checkboxes)
+    document.getElementById('chk-ortofoto').addEventListener('change', function (e) {
+        ortofotoLayer.setVisible(e.target.checked);
+    });
+
+    document.getElementById('chk-lotes').addEventListener('change', function (e) {
+        lotesLayer.setVisible(e.target.checked);
+    });
+
+    document.getElementById('chk-osm').addEventListener('change', function (e) {
+        osmLayer.setVisible(e.target.checked);
+    });
+
+    // 6. Evento de Clique para Atributos do Lote
     map.on('singleclick', function (evt) {
-        const feature = map.forEachFeatureAtPixel(evt.pixel, f => f);
+        if (draw) return; // Evita popup durante medição
+
+        const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, {
+            layerFilter: layer => layer === lotesLayer
+        });
 
         if (feature) {
             const properties = feature.getProperties();
-            let htmlContent = '<h4 style="margin: 0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left: 15px; margin: 0;">';
+            let htmlContent = '<h4 style="margin:0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left:15px; margin:0;">';
 
             for (let prop in properties) {
                 if (prop !== 'geometry') {
@@ -201,13 +300,394 @@
         }
     });
 
-    // Alternador de Camadas Base (Ortofoto <-> OSM)
+    // 7. Ferramenta de Medição com Tooltip em Tempo Real
+    let draw;
+    let measureTooltipElement;
+    let measureTooltip;
+
+    function formatLength(line) {
+        const length = ol.sphere.getLength(line);
+        return length > 1000 ? (length / 1000).toFixed(2) + ' km' : length.toFixed(2) + ' m';
+    }
+
+    function formatArea(polygon) {
+        const area = ol.sphere.getArea(polygon);
+        return area > 10000 ? (area / 10000).toFixed(2) + ' ha' : area.toFixed(2) + ' m²';
+    }
+
+    function createMeasureTooltip() {
+        if (measureTooltipElement) {
+            measureTooltipElement.parentNode.removeChild(measureTooltipElement);
+        }
+        measureTooltipElement = document.createElement('div');
+        measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
+        measureTooltip = new ol.Overlay({
+            element: measureTooltipElement,
+            offset: [0, -15],
+            positioning: 'bottom-center',
+            stopEvent: false
+        });
+        map.addOverlay(measureTooltip);
+    }
+
+    function addInteraction(type) {
+        if (draw) map.removeInteraction(draw);
+
+        draw = new ol.interaction.Draw({
+            source: measureSource,
+            type: type,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
+                stroke: new ol.style.Stroke({ color: 'rgba(0, 0, 0, 0.5)', lineDash: [10, 10], width: 2 }),
+                image: new ol.style.Circle({
+                    radius: 5,
+                    stroke: new ol.style.Stroke({ color: 'rgba(0, 0, 0, 0.7)' }),
+                    fill: new ol.style.Fill({ colorSim, é totalmente possível! Basta adicionar uma caixa de seleção (*checkbox*) no menu para que você possa alternar a visibilidade da camada de lotes da REURB (marcando ou desmarcando), além dos botões do mapa base (Ortofoto/OSM), da barra de escala, do indicador de Norte e da medição.
+
+Segue a estrutura do código atualizada para você substituir o conteúdo do arquivo `index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geoportal REURB</title>
+
+    <!-- OpenLayers CSS/JS -->
+    <link rel="stylesheet" href="[https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css](https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css)">
+    <script src="[https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js](https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js)"></script>
+
+    <!-- Proj4js (Suporte a SIRGAS 2000 - EPSG:4674) -->
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js](https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js)"></script>
+
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            font-family: Arial, sans-serif; 
+        }
+
+        #map { 
+            width: 100%; 
+            height: 100%; 
+        }
+
+        /* Estilo da janela de informações do lote */
+        .ol-popup {
+            position: absolute;
+            background-color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #cccccc;
+            bottom: 12px;
+            left: -50px;
+            min-width: 200px;
+        }
+        .ol-popup:after, .ol-popup:before {
+            top: 100%; 
+            border: solid transparent; 
+            content: " ";
+            height: 0; 
+            width: 0; 
+            position: absolute; 
+            pointer-events: none;
+        }
+        .ol-popup:after { 
+            border-top-color: #ffffff; 
+            border-width: 10px; 
+            left: 48px; 
+            margin-left: -10px; 
+        }
+        .ol-popup-closer { 
+            text-decoration: none; 
+            position: absolute; 
+            top: 4px; 
+            right: 8px; 
+            color: #888888; 
+            font-weight: bold; 
+        }
+
+        /* Painel principal de controle */
+        .map-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            z-index: 1000;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .menu-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .measure-btn {
+            background: #007bff;
+            color: #ffffff;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-right: 2px;
+            margin-top: 4px;
+        }
+        .measure-btn:hover { background: #0056b3; }
+
+        /* Seta indicadora do Norte */
+        .north-arrow {
+            position: absolute;
+            bottom: 35px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 6px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            text-align: center;
+            font-weight: bold;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            user-select: none;
+        }
+
+        /* Barra de Escala */
+        .ol-scale-line {
+            left: 10px !important;
+            bottom: 10px !important;
+            background: rgba(0, 60, 136, 0.7) !important;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<!-- Balão de Informações (Popup) -->
+<div id="popup" class="ol-popup">
+    <a href="#" id="popup-closer" class="ol-popup-closer">✕</a>
+    <div id="popup-content"></div>
+</div>
+
+<!-- Indicador do Norte -->
+<div class="north-arrow" title="Norte Magnético">N ↑</div>
+
+<!-- Gerenciador de Camadas e Medição -->
+<div class="map-menu">
+    <div>
+        <b>Camadas Vetoriais:</b><br>
+        <input type="checkbox" id="chk-lotes" checked>
+        <label for="chk-lotes">Lotes REURB</label>
+    </div>
+
+    <div class="menu-section">
+        <b>Fundo de Mapa:</b><br>
+        <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
+        <label for="ortofoto">Ortofoto Municipal</label><br>
+        <input type="radio" id="osm" name="baseMap" value="osm">
+        <label for="osm">OpenStreetMap</label>
+    </div>
+
+    <div class="menu-section">
+        <b>Ferramentas de Medição:</b><br>
+        <button id="btn-dist" class="measure-btn">Distância</button>
+        <button id="btn-area" class="measure-btn">Área</button>
+        <button id="btn-clear" class="measure-btn" style="background:#6c757d;">Limpar</button>
+    </div>
+</div>
+
+<script>
+    // 1. Definição do CRS SIRGAS 2000 (EPSG:4674)
+    proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
+    ol.proj.proj4.register(proj4);
+
+    // 2. Camadas Base
+    const osmLayer = new ol.layer.Tile({
+        source: new ol.source.OSM(),
+        visible: false
+    });
+
+    const ortofotoLayer = new ol.layer.Tile({
+        source: new ol.source.XYZ({
+            url: 'ortofoto_tiles/{z}/{x}/{y}.png',
+            maxZoom: 21,
+            attributions: 'Ortofoto © Prefeitura Municipal'
+        }),
+        visible: true
+    });
+
+    // 3. Camada Vetorial dos Lotes
+    const lotesSource = new ol.source.Vector({
+        url: 'PRELIMINAR_LOTES.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    const lotesLayer = new ol.layer.Vector({
+        source: lotesSource,
+        visible: true, // Visível por padrão
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }),
+            fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.15)' })
+        })
+    });
+
+    // 4. Camada para Desenho de Medições
+    const measureSource = new ol.source.Vector();
+    const measureLayer = new ol.layer.Vector({
+        source: measureSource,
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
+            stroke: new ol.style.Stroke({ color: '#ffcc33', width: 3 }),
+            image: new ol.style.Circle({
+                radius: 6,
+                fill: new ol.style.Fill({ color: '#ffcc33' })
+            })
+        })
+    });
+
+    // 5. Configuração da Janela de Popup
+    const popupContainer = document.getElementById('popup');
+    const popupContent = document.getElementById('popup-content');
+    const popupCloser = document.getElementById('popup-closer');
+
+    const overlay = new ol.Overlay({
+        element: popupContainer,
+        autoPan: { animation: { duration: 250 } }
+    });
+
+    popupCloser.onclick = function () {
+        overlay.setPosition(undefined);
+        popupCloser.blur();
+        return false;
+    };
+
+    // 6. Configuração da Barra de Escala
+    const scaleLineControl = new ol.control.ScaleLine({
+        units: 'metric',
+        bar: true,
+        steps: 4,
+        text: true,
+        minWidth: 140
+    });
+
+    // 7. Inicialização do Mapa
+    const map = new ol.Map({
+        target: 'map',
+        controls: ol.control.defaults.defaults().extend([scaleLineControl]),
+        layers: [osmLayer, ortofotoLayer, lotesLayer, measureLayer],
+        overlays: [overlay],
+        view: new ol.View({
+            center: ol.proj.fromLonLat([-55, -30]),
+            zoom: 5
+        })
+    });
+
+    // Enquadramento automático da extensão dos lotes
+    lotesSource.on('change', function () {
+        if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
+            map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+        }
+    });
+
+    // 8. Evento de Ativação / Desativação da Camada de Lotes (Checkbox)
+    document.getElementById('chk-lotes').addEventListener('change', function (e) {
+        lotesLayer.setVisible(e.target.checked);
+        if (!e.target.checked) {
+            overlay.setPosition(undefined); // Fecha o popup caso a camada seja oculta
+        }
+    });
+
+    // Alternador de Fundo de Mapa (Radio buttons)
     document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
         elem.addEventListener('change', function (e) {
             osmLayer.setVisible(e.target.value === 'osm');
             ortofotoLayer.setVisible(e.target.value === 'ortofoto');
         });
     });
+
+    // 9. Identificação de Atributos via Clique
+    map.on('singleclick', function (evt) {
+        if (draw) return; // Desativa consulta enquanto estiver medindo
+        if (!lotesLayer.getVisible()) return; // Não consulta se a camada estiver invisível
+
+        const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, {
+            layerFilter: layer => layer === lotesLayer
+        });
+
+        if (feature) {
+            const properties = feature.getProperties();
+            let htmlContent = '<h4 style="margin:0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left:15px; margin:0;">';
+
+            for (let prop in properties) {
+                if (prop !== 'geometry') {
+                    htmlContent += `<li><b>${prop}:</b> ${properties[prop]}</li>`;
+                }
+            }
+            htmlContent += '</ul>';
+
+            popupContent.innerHTML = htmlContent;
+            overlay.setPosition(evt.coordinate);
+        } else {
+            overlay.setPosition(undefined);
+        }
+    });
+
+    // 10. Lógica das Ferramentas de Medição
+    let draw;
+
+    function addInteraction(type) {
+        if (draw) map.removeInteraction(draw);
+
+        draw = new ol.interaction.Draw({
+            source: measureSource,
+            type: type
+        });
+
+        draw.on('drawend', function (evt) {
+            const geom = evt.feature.getGeometry();
+            let output;
+
+            if (type === 'LineString') {
+                const length = ol.sphere.getLength(geom);
+                output = length > 1000 ? (length / 1000).toFixed(2) + ' km' : length.toFixed(2) + ' m';
+                alert('Distância Medida: ' + output);
+            } else if (type === 'Polygon') {
+                const area = ol.sphere.getArea(geom);
+                output = area > 10000 ? (area / 10000).toFixed(2) + ' ha' : area.toFixed(2) + ' m²';
+                alert('Área Medida: ' + output);
+            }
+            map.removeInteraction(draw);
+            draw = null;
+        });
+
+        map.addInteraction(draw);
+    }
+
+    document.getElementById('btn-dist').onclick = () => addInteraction('LineString');
+    document.getElementById('btn-area').onclick = () => addInteraction('Polygon');
+    document.getElementById('btn-clear').onclick = () => {
+        if (draw) {
+            map.removeInteraction(draw);
+            draw = null;
+        }
+        measureSource.clear();
+    };
 </script>
 
 </body>
