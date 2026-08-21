@@ -4,18 +4,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu Geoportal Interativo</title>
+    <title>Geoportal REURB - Ortofoto Municipal</title>
 
     <!-- OpenLayers CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
     <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
 
-    <!-- Proj4js (EPSG:4674) -->
+    <!-- Proj4js (EPSG:4674 - SIRGAS 2000) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: Arial, sans-serif; }
-        #map { width: 100%; height: 100%; }
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            font-family: Arial, sans-serif; 
+        }
+
+        #map { 
+            width: 100%; 
+            height: 100%; 
+        }
 
         /* Estilo do Popup */
         .ol-popup {
@@ -27,30 +37,45 @@
             border: 1px solid #cccccc;
             bottom: 12px;
             left: -50px;
-            min-width: 200px;
+            min-width: 220px;
         }
         .ol-popup:after, .ol-popup:before {
-            top: 100%;
-            border: solid transparent;
+            top: 100%; 
+            border: solid transparent; 
             content: " ";
-            height: 0;
-            width: 0;
-            position: absolute;
+            height: 0; 
+            width: 0; 
+            position: absolute; 
             pointer-events: none;
         }
-        .ol-popup:after { border-top-color: white; border-width: 10px; left: 48px; margin-left: -10px; }
-        .ol-popup-closer { text-decoration: none; position: absolute; top: 2px; right: 8px; color: #999; font-weight: bold; }
+        .ol-popup:after { 
+            border-top-color: white; 
+            border-width: 10px; 
+            left: 48px; 
+            margin-left: -10px; 
+        }
+        .ol-popup-closer { 
+            text-decoration: none; 
+            position: absolute; 
+            top: 2px; 
+            right: 8px; 
+            color: #999; 
+            font-weight: bold; 
+        }
 
-        /* Controles flutuantes */
+        /* Menu de controle de camadas */
         .map-menu {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 16px;
             border-radius: 6px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             z-index: 1000;
+        }
+        .map-menu label {
+            cursor: pointer;
         }
     </style>
 </head>
@@ -59,41 +84,43 @@
 
 <div id="map"></div>
 
-<!-- Elemento do Popup -->
+<!-- Elemento HTML do Popup -->
 <div id="popup" class="ol-popup">
     <a href="#" id="popup-closer" class="ol-popup-closer">✕</a>
     <div id="popup-content"></div>
 </div>
 
-<!-- Menu de Controle de Camadas -->
+<!-- Menu para alternar mapa de fundo -->
 <div class="map-menu">
-    <label><b>Mapa Base:</b></label><br>
-    <input type="radio" id="osm" name="baseMap" value="osm" checked>
-    <label for="osm">OpenStreetMap</label><br>
-    <input type="radio" id="satellite" name="baseMap" value="satellite">
-    <label for="satellite">Satélite (Esri)</label>
+    <label><b>Fundo de Mapa:</b></label><br>
+    <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
+    <label for="ortofoto">Ortofoto Municipal</label><br>
+    <input type="radio" id="osm" name="baseMap" value="osm">
+    <label for="osm">OpenStreetMap</label>
 </div>
 
 <script>
-    // 1. Projeção SIRGAS 2000
+    // 1. Registro do Sistema de Referência SIRGAS 2000 (EPSG:4674)
     proj4.defs("EPSG:4674", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
     ol.proj.proj4.register(proj4);
 
-    // 2. Mapas Base
+    // 2. Camada Mapa Base - OpenStreetMap (Desativada por padrão)
     const osmLayer = new ol.layer.Tile({
         source: new ol.source.OSM(),
-        visible: true
-    });
-
-    const satLayer = new ol.layer.Tile({
-        source: new ol.source.XYZ({
-            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            maxZoom: 19
-        }),
         visible: false
     });
 
-    // 3. Camada de Lotes
+    // 3. Camada Mapa Base - Ortofoto Municipal (Pasta de Tiles XYZ enviada via GitHub Desktop)
+    const ortofotoLayer = new ol.layer.Tile({
+        source: new ol.source.XYZ({
+            url: 'ortofoto_tiles/{z}/{x}/{y}.png',
+            maxZoom: 21,
+            attributions: 'Ortofoto © Prefeitura Municipal'
+        }),
+        visible: true
+    });
+
+    // 4. Camada Vetorial - Lotes da REURB (GeoJSON em SIRGAS 2000)
     const lotesSource = new ol.source.Vector({
         url: 'PRELIMINAR_LOTES.geojson',
         format: new ol.format.GeoJSON({
@@ -105,12 +132,17 @@
     const lotesLayer = new ol.layer.Vector({
         source: lotesSource,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#ffcc00', width: 2 }),
-            fill: new ol.style.Fill({ color: 'rgba(255, 204, 0, 0.3)' })
+            stroke: new ol.style.Stroke({ 
+                color: '#ff0000', 
+                width: 2 
+            }),
+            fill: new ol.style.Fill({ 
+                color: 'rgba(255, 0, 0, 0.15)' 
+            })
         })
     });
 
-    // 4. Configuração do Popup Overlay
+    // 5. Configuração da Janela Popup
     const popupContainer = document.getElementById('popup');
     const popupContent = document.getElementById('popup-content');
     const popupCloser = document.getElementById('popup-closer');
@@ -126,10 +158,10 @@
         return false;
     };
 
-    // 5. Inicialização do Mapa
+    // 6. Inicialização do Mapa
     const map = new ol.Map({
         target: 'map',
-        layers: [osmLayer, satLayer, lotesLayer],
+        layers: [osmLayer, ortofotoLayer, lotesLayer],
         overlays: [overlay],
         view: new ol.View({
             center: ol.proj.fromLonLat([-55, -30]),
@@ -137,22 +169,24 @@
         })
     });
 
-    // Fit nos Lotes
+    // Ajuste automático da extensão do mapa ao carregar a camada de lotes
     lotesSource.on('change', function () {
         if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
-            map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+            map.getView().fit(lotesSource.getExtent(), { 
+                padding: [50, 50, 50, 50], 
+                duration: 1000 
+            });
         }
     });
 
-    // 6. Clique para exibir Popup com Atributos
+    // Consulta de Atributos ao clicar no lote
     map.on('singleclick', function (evt) {
         const feature = map.forEachFeatureAtPixel(evt.pixel, f => f);
 
         if (feature) {
             const properties = feature.getProperties();
-            let htmlContent = '<h4>Informações do Lote</h4><ul>';
+            let htmlContent = '<h4 style="margin: 0 0 8px 0;">Dados do Lote (REURB)</h4><ul style="padding-left: 15px; margin: 0;">';
 
-            // Percorre as propriedades ignorando a geometria
             for (let prop in properties) {
                 if (prop !== 'geometry') {
                     htmlContent += `<li><b>${prop}:</b> ${properties[prop]}</li>`;
@@ -167,11 +201,11 @@
         }
     });
 
-    // 7. Alternar Camadas Base
+    // Alternador de Camadas Base (Ortofoto <-> OSM)
     document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
         elem.addEventListener('change', function (e) {
             osmLayer.setVisible(e.target.value === 'osm');
-            satLayer.setVisible(e.target.value === 'satellite');
+            ortofotoLayer.setVisible(e.target.value === 'ortofoto');
         });
     });
 </script>
