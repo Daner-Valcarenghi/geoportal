@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meu Geoportal</title>
+
+    <!-- OpenLayers -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
+
+    <style>
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <script>
+
+        // Mapa base
+        const baseMap = new ol.layer.Tile({
+            source: new ol.source.OSM()
+        });
+
+
+        // Camada GeoJSON
+        const lotes = new ol.layer.Vector({
+            source: new ol.source.Vector({
+                url: 'PRELIMINAR%20LOTES.geojson',
+                format: new ol.format.GeoJSON()
+            })
+        });
+
+
+        // Criar o mapa
+        const map = new ol.Map({
+
+            target: 'map',
+
+            layers: [
+                baseMap,
+                lotes
+            ],
+
+            view: new ol.View({
+
+                center: ol.proj.fromLonLat([
+                    -55.0,
+                    -30.0
+                ]),
+
+                zoom: 10
+
+            })
+
+        });
+
+    </script>
+
+</body>
+
+</html>
