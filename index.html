@@ -14,71 +14,87 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
-       /* --- ESTILO DO TÍTULO E AJUSTES RESPONSIVOS --- */
-.map-title {
-    position: absolute;
-    top: 10px;
-    left: 50px;
-    z-index: 999;
-    background: rgba(255, 255, 255, 0.92);
-    padding: 6px 12px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-    border: 1px solid #cccccc;
-    pointer-events: none;
-    max-width: calc(100% - 220px);
-}
+        /* Base e estrutura da página (Essencial para exibir o mapa) */
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            font-family: Arial, sans-serif; 
+            overflow: hidden;
+        }
 
-.map-title h1 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: bold;
-    color: #1a252f;
-    text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+        #map { 
+            width: 100%; 
+            height: 100%; 
+        }
 
-.map-title h2 {
-    margin: 1px 0 0 0;
-    font-size: 11px;
-    font-weight: normal;
-    color: #555555;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+        /* --- ESTILO DO TÍTULO E AJUSTES RESPONSIVOS --- */
+        .map-title {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 999;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 6px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            border: 1px solid #cccccc;
+            pointer-events: none;
+            max-width: calc(100% - 220px);
+        }
 
-/* Posicionamento dos Botões de Zoom no Desktop */
-.ol-zoom {
-    top: 10px !important;
-    left: 10px !important;
-}
+        .map-title h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: bold;
+            color: #1a252f;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-/* --- REGRAS EXCLUSIVAS PARA CELULAR (Mobile) --- */
-@media (max-width: 600px) {
-    .map-title {
-        left: 10px;
-        top: 10px;
-        padding: 4px 8px;
-        max-width: 170px; /* Garante que o título não invada o botão do menu */
-    }
+        .map-title h2 {
+            margin: 1px 0 0 0;
+            font-size: 11px;
+            font-weight: normal;
+            color: #555555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    .map-title h1 {
-        font-size: 12px;
-    }
+        /* Posicionamento dos Botões de Zoom no Desktop */
+        .ol-zoom {
+            top: 10px !important;
+            left: 10px !important;
+        }
 
-    .map-title h2 {
-        font-size: 9px;
-    }
+        /* --- REGRAS EXCLUSIVAS PARA CELULAR (Mobile) --- */
+        @media (max-width: 600px) {
+            .map-title {
+                left: 10px;
+                top: 10px;
+                padding: 4px 8px;
+                max-width: 160px; /* Garante que não bata na caixa de camadas */
+            }
 
-    /* Reposiciona o Zoom (+ / -) para ficar abaixo do título no celular */
-    .ol-zoom {
-        top: 60px !important;
-        left: 10px !important;
-    }
-}
+            .map-title h1 {
+                font-size: 11px;
+            }
+
+            .map-title h2 {
+                font-size: 9px;
+            }
+
+            /* Reposiciona o Zoom (+ / -) para ficar abaixo do título no celular */
+            .ol-zoom {
+                top: 55px !important;
+                left: 10px !important;
+            }
+        }
+
         /* Estilo do Popup */
         .ol-popup {
             position: absolute;
@@ -215,13 +231,13 @@
 </head>
 
 <body>
+
 <!-- Título no Canto Superior Esquerdo -->
 <div class="map-title">
-    <h1> GEOPORTAL REURB</h1>
-    <h2>  NÚCLEO VB</h2>
+    <h1>GEOPORTAL REURB</h1>
+    <h2>NÚCLEO VB</h2>
 </div>
 
-<div id="map"></div>
 <div id="map"></div>
 
 <!-- Balão de Informações (Popup) -->
@@ -295,7 +311,7 @@
 
     // 3. Camadas Vetoriais
 
-    // 3.1 Perímetro do Núcleo (Linha tracejada destacada)
+    // 3.1 Perímetro do Núcleo
     const perimetroSource = new ol.source.Vector({
         url: 'PERÍMETRO_DO_NÚCLEO.geojson',
         format: new ol.format.GeoJSON({
@@ -308,7 +324,7 @@
         source: perimetroSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#000000', width: 3, lineDash: [6, 6] }), // PRETO pontilhado
+            stroke: new ol.style.Stroke({ color: '#000000', width: 3, lineDash: [6, 6] }),
             fill: new ol.style.Fill({ color: 'rgba(0, 0, 0, 0.0)' })
         })
     });
@@ -326,7 +342,7 @@
         source: lotesSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#33fa2c', width: 2 }), // VerDE
+            stroke: new ol.style.Stroke({ color: '#33fa2c', width: 2 }),
             fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.0)' })
         })
     });
@@ -344,12 +360,12 @@
         source: edificacoesSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#e31a1c', width: 1.5 }), // Roxo
+            stroke: new ol.style.Stroke({ color: '#e31a1c', width: 1.5 }),
             fill: new ol.style.Fill({ color: 'rgba(128, 0, 128, 0.0)' })
         })
     });
 
-    // 3.4 Sistema Viário (Estilo OSM com rotação de rótulo e largura real de 4 metros)
+    // 3.4 Sistema Viário
     const viarioSource = new ol.source.Vector({
         url: 'SISTEMA_VIARIO.geojson',
         format: new ol.format.GeoJSON({
@@ -359,22 +375,17 @@
     });
 
     function estiloSistemaViario(feature, resolution) {
-        // Converte 4 metros de terreno em pixels na escala atual
         const larguraEmMetros = 4;
-        const larguraEmPixels = Math.max(larguraEmMetros / resolution, 3); // Mínimo de 3px para visibilidade em zooms distantes
-
-        // Obtém o nome da rua do atributo "NOME"
+        const larguraEmPixels = Math.max(larguraEmMetros / resolution, 3);
         const nomeVia = feature.get('NOME') || '';
 
         return [
-            // Camada 1: Borda da rua (Cinza escuro)
             new ol.style.Style({
                 stroke: new ol.style.Stroke({
                     color: '#666666',
                     width: larguraEmPixels + 2
                 })
             }),
-            // Camada 2: Pista de rolamento (Branco) + Rótulo com o atributo NOME
             new ol.style.Style({
                 stroke: new ol.style.Stroke({
                     color: '#ffffff',
@@ -385,7 +396,7 @@
                     font: 'bold 12px Arial, sans-serif',
                     fill: new ol.style.Fill({ color: '#222222' }),
                     stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 }),
-                    placement: 'line', // Acompanha o traçado da rua
+                    placement: 'line',
                     overflow: true
                 })
             })
@@ -437,7 +448,7 @@
         minWidth: 140
     });
 
-    // 7. Mapa e Visão (Permite Rotação Livre)
+    // 7. Mapa e Visão
     const view = new ol.View({
         center: ol.proj.fromLonLat([-55, -30]),
         zoom: 5,
@@ -467,7 +478,7 @@
         }
     });
 
-    // 8. Rotação Dinâmica da Seta Norte e Reset de Orientação
+    // 8. Rotação Dinâmica da Seta Norte
     const northBtn = document.getElementById('btn-north');
 
     view.on('change:rotation', function () {
