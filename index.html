@@ -13,8 +13,9 @@
     <!-- Proj4js (EPSG:4674 - SIRGAS 2000) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
-    <!-- shp-write: Gerador de Shapefile (.ZIP) no navegador -->
-    <script src="https://unpkg.com/shp-write@latest/shpwrite.js"></script>
+    <!-- JSZip & Mapbox shp-write: Gerador de Shapefile (.ZIP) no navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mapbox/shp-write@latest/shpwrite.js"></script>
 
     <style>
         /* Base e estrutura da página */
@@ -529,7 +530,7 @@
         });
     });
 
-    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP contendo .shp, .shx, .dbf, .prj)
+    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP)
     function downloadShapefile(source, layerName) {
         const features = source.getFeatures();
         if (features.length === 0) {
@@ -537,7 +538,7 @@
             return;
         }
 
-        // Exporta em coordenadas geográficas SIRGAS 2000 (EPSG:4674)
+        // Exportar em coordenadas SIRGAS 2000 (EPSG:4674)
         const format = new ol.format.GeoJSON({
             dataProjection: 'EPSG:4674',
             featureProjection: 'EPSG:3857'
@@ -545,7 +546,6 @@
 
         const geojsonObject = format.writeFeaturesObject(features);
 
-        // Opções de salvamento do Shapefile
         const options = {
             folder: layerName,
             types: {
@@ -555,8 +555,31 @@
             }
         };
 
-        // Utiliza a biblioteca shp-write para gerar o arquivo .zip
-        shpwrite.download(geojsonObject, options);
+        try {
+            // Gerar o ZIP do Shapefile via shpwrite
+            shpwrite.zip(geojsonObject, options).then(function(content) {
+                // Converter Base64/Buffer para Blob do tipo ZIP
+                const blob = new Blob([content], { type: 'application/zip' });
+                const url = URL.createObjectURL(blob);
+                
+                // Forçar o download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = layerName + '.zip';
+                document.body.appendChild(a);
+                a.click();
+                
+                // Limpeza
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }).catch(function(err) {
+                console.error('Erro ao gerar Shapefile:', err);
+                alert('Ocorreu um erro ao converter a camada para Shapefile. Verifique o console do navegador.');
+            });
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao processar os dados vetoriais.');
+        }
     }
 
     // Eventos de clique nos botões "SHP ⬇"
