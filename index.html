@@ -530,7 +530,7 @@
         });
     });
 
-    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP)
+    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP) - CORRIGIDA
     function downloadShapefile(source, layerName) {
         const features = source.getFeatures();
         if (features.length === 0) {
@@ -558,23 +558,34 @@
         try {
             // Gerar o ZIP do Shapefile via shpwrite
             shpwrite.zip(geojsonObject, options).then(function(content) {
-                // Converter Base64/Buffer para Blob do tipo ZIP
-                const blob = new Blob([content], { type: 'application/zip' });
+                let blob;
+                // Converte Base64 para ArrayBuffer binário de modo que o WinRAR reconheça o ZIP
+                if (typeof content === 'string') {
+                    const byteCharacters = atob(content);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    blob = new Blob([byteArray], { type: 'application/zip' });
+                } else {
+                    blob = new Blob([content], { type: 'application/zip' });
+                }
+
+                // Disparar o download
                 const url = URL.createObjectURL(blob);
-                
-                // Forçar o download
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = layerName + '.zip';
                 document.body.appendChild(a);
                 a.click();
-                
-                // Limpeza
+
+                // Limpeza de memória
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }).catch(function(err) {
                 console.error('Erro ao gerar Shapefile:', err);
-                alert('Ocorreu um erro ao converter a camada para Shapefile. Verifique o console do navegador.');
+                alert('Ocorreu um erro ao converter a camada para Shapefile.');
             });
         } catch (e) {
             console.error(e);
