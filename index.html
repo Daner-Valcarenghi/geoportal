@@ -13,7 +13,12 @@
     <!-- Proj4js (EPSG:4674 - SIRGAS 2000) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
+    <!-- JSZip & Mapbox shp-write: Gerador de Shapefile (.ZIP) no navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mapbox/shp-write@latest/shpwrite.js"></script>
+
     <style>
+        /* Base e estrutura da página */
         html, body { 
             margin: 0; 
             padding: 0; 
@@ -26,6 +31,71 @@
         #map { 
             width: 100%; 
             height: 100%; 
+        }
+
+        /* --- ESTILO DO TÍTULO E AJUSTES RESPONSIVOS --- */
+        .map-title {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 999;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 6px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            border: 1px solid #cccccc;
+            pointer-events: none;
+            max-width: calc(100% - 220px);
+        }
+
+        .map-title h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: bold;
+            color: #1a252f;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .map-title h2 {
+            margin: 1px 0 0 0;
+            font-size: 11px;
+            font-weight: normal;
+            color: #555555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Posicionamento dos Botões de Zoom no Desktop */
+        .ol-zoom {
+            top: 10px !important;
+            left: 10px !important;
+        }
+
+        /* --- REGRAS EXCLUSIVAS PARA CELULAR (Mobile) --- */
+        @media (max-width: 600px) {
+            .map-title {
+                left: 10px;
+                top: 10px;
+                padding: 4px 8px;
+                max-width: 160px;
+            }
+
+            .map-title h1 {
+                font-size: 11px;
+            }
+
+            .map-title h2 {
+                font-size: 9px;
+            }
+
+            .ol-zoom {
+                top: 55px !important;
+                left: 10px !important;
+            }
         }
 
         /* Estilo do Popup */
@@ -101,13 +171,46 @@
             font-size: 13px;
             line-height: 1.5;
             margin-top: 5px;
-            max-width: 240px;
+            max-width: 270px;
             transition: all 0.3s ease-in-out;
         }
 
-        /* Classe para recolher o menu */
         .map-menu.collapsed {
             display: none;
+        }
+
+        /* Estilo das linhas das camadas no menu com botão de download */
+        .layer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .layer-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .btn-download-shp {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+        .btn-download-shp:hover {
+            background: #28a745;
+            color: #ffffff;
+            border-color: #28a745;
         }
         
         .menu-section {
@@ -129,7 +232,7 @@
         }
         .measure-btn:hover { background: #0056b3; }
 
-        /* Seta Norte Clicável e Rotativa */
+        /* Seta Norte */
         .north-arrow-btn {
             position: absolute;
             bottom: 35px;
@@ -150,9 +253,7 @@
             user-select: none;
             transition: transform 0.1s linear;
         }
-        .north-arrow-btn:hover {
-            background: #ffffff;
-        }
+        .north-arrow-btn:hover { background: #ffffff; }
 
         /* Barra de Escala */
         .ol-scale-line {
@@ -165,6 +266,12 @@
 
 <body>
 
+<!-- Título no Canto Superior Esquerdo -->
+<div class="map-title">
+    <h1>GEOPORTAL REURB</h1>
+    <h2>NÚCLEO VB</h2>
+</div>
+
 <div id="map"></div>
 
 <!-- Balão de Informações (Popup) -->
@@ -173,10 +280,10 @@
     <div id="popup-content"></div>
 </div>
 
-<!-- Botão da Seta Norte (Interativo) -->
+<!-- Botão da Seta Norte -->
 <button id="btn-north" class="north-arrow-btn" title="Clique para reorientar para o Norte">N ↑</button>
 
-<!-- Gerenciador de Camadas e Medição (Recolhível) -->
+<!-- Gerenciador de Camadas e Medição (Recolhível com Downloads SHP) -->
 <div class="map-menu-container">
     <button id="btn-toggle-menu" class="menu-toggle-btn">
         <span>Camadas & Ferramentas</span>
@@ -186,23 +293,40 @@
     <div id="map-menu" class="map-menu">
         <div>
             <b>Camadas Vetoriais:</b><br>
-            <input type="checkbox" id="chk-perimetro" checked>
-            <label for="chk-perimetro">Perímetro do Núcleo</label><br>
+            
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="chk-perimetro" checked> Perímetro
+                </label>
+                <button class="btn-download-shp" id="dl-perimetro" title="Baixar Shapefile (.zip)">SHP ⬇</button>
+            </div>
 
-            <input type="checkbox" id="chk-lotes" checked>
-            <label for="chk-lotes">Lotes REURB</label><br>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="chk-lotes" checked> Lotes REURB
+                </label>
+                <button class="btn-download-shp" id="dl-lotes" title="Baixar Shapefile (.zip)">SHP ⬇</button>
+            </div>
 
-            <input type="checkbox" id="chk-edificacoes" checked>
-            <label for="chk-edificacoes">Edificações</label><br>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="chk-edificacoes" checked> Edificações
+                </label>
+                <button class="btn-download-shp" id="dl-edificacoes" title="Baixar Shapefile (.zip)">SHP ⬇</button>
+            </div>
 
-            <input type="checkbox" id="chk-viario" checked>
-            <label for="chk-viario">Sistema Viário</label>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="chk-viario" checked> Sistema Viário
+                </label>
+                <button class="btn-download-shp" id="dl-viario" title="Baixar Shapefile (.zip)">SHP ⬇</button>
+            </div>
         </div>
 
         <div class="menu-section">
             <b>Fundo de Mapa:</b><br>
             <input type="radio" id="ortofoto" name="baseMap" value="ortofoto" checked>
-            <label for="ortofoto">Ortofoto Municipal</label><br>
+            <label for="ortofoto">Ortofoto Local</label><br>
             <input type="radio" id="osm" name="baseMap" value="osm">
             <label for="osm">OpenStreetMap</label>
         </div>
@@ -237,98 +361,67 @@
     });
 
     // 3. Camadas Vetoriais
-
-    // 3.1 Perímetro do Núcleo (Linha tracejada destacada)
     const perimetroSource = new ol.source.Vector({
         url: 'PERÍMETRO_DO_NÚCLEO.geojson',
-        format: new ol.format.GeoJSON({
-            dataProjection: 'EPSG:4674',
-            featureProjection: 'EPSG:3857'
-        })
+        format: new ol.format.GeoJSON({ dataProjection: 'EPSG:4674', featureProjection: 'EPSG:3857' })
     });
-
     const perimetroLayer = new ol.layer.Vector({
         source: perimetroSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#000000', width: 3, lineDash: [6, 6] }), // PRETO pontilhado
+            stroke: new ol.style.Stroke({ color: '#000000', width: 3, lineDash: [6, 6] }),
             fill: new ol.style.Fill({ color: 'rgba(0, 0, 0, 0.0)' })
         })
     });
 
-    // 3.2 Lotes
     const lotesSource = new ol.source.Vector({
         url: 'PRELIMINAR_LOTES.geojson',
-        format: new ol.format.GeoJSON({
-            dataProjection: 'EPSG:4674',
-            featureProjection: 'EPSG:3857'
-        })
+        format: new ol.format.GeoJSON({ dataProjection: 'EPSG:4674', featureProjection: 'EPSG:3857' })
     });
-
     const lotesLayer = new ol.layer.Vector({
         source: lotesSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#33fa2c', width: 2 }), // VerDE
+            stroke: new ol.style.Stroke({ color: '#33fa2c', width: 2 }),
             fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.0)' })
         })
     });
 
-    // 3.3 Edificações
     const edificacoesSource = new ol.source.Vector({
         url: 'EDIFICACOES.geojson',
-        format: new ol.format.GeoJSON({
-            dataProjection: 'EPSG:4674',
-            featureProjection: 'EPSG:3857'
-        })
+        format: new ol.format.GeoJSON({ dataProjection: 'EPSG:4674', featureProjection: 'EPSG:3857' })
     });
-
     const edificacoesLayer = new ol.layer.Vector({
         source: edificacoesSource,
         visible: true,
         style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#e31a1c', width: 1.5 }), // Roxo
+            stroke: new ol.style.Stroke({ color: '#e31a1c', width: 1.5 }),
             fill: new ol.style.Fill({ color: 'rgba(128, 0, 128, 0.0)' })
         })
     });
 
-    // 3.4 Sistema Viário (Estilo OSM com rotação de rótulo e largura real de 4 metros)
     const viarioSource = new ol.source.Vector({
         url: 'SISTEMA_VIARIO.geojson',
-        format: new ol.format.GeoJSON({
-            dataProjection: 'EPSG:4674',
-            featureProjection: 'EPSG:3857'
-        })
+        format: new ol.format.GeoJSON({ dataProjection: 'EPSG:4674', featureProjection: 'EPSG:3857' })
     });
 
     function estiloSistemaViario(feature, resolution) {
-        // Converte 4 metros de terreno em pixels na escala atual
         const larguraEmMetros = 4;
-        const larguraEmPixels = Math.max(larguraEmMetros / resolution, 3); // Mínimo de 3px para visibilidade em zooms distantes
-
-        // Obtém o nome da rua do atributo "NOME"
+        const larguraEmPixels = Math.max(larguraEmMetros / resolution, 3);
         const nomeVia = feature.get('NOME') || '';
 
         return [
-            // Camada 1: Borda da rua (Cinza escuro)
             new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: '#666666',
-                    width: larguraEmPixels + 2
-                })
+                stroke: new ol.style.Stroke({ color: '#666666', width: larguraEmPixels + 2 })
             }),
-            // Camada 2: Pista de rolamento (Branco) + Rótulo com o atributo NOME
             new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: '#ffffff',
-                    width: larguraEmPixels
-                }),
+                stroke: new ol.style.Stroke({ color: '#ffffff', width: larguraEmPixels }),
                 text: new ol.style.Text({
                     text: String(nomeVia),
                     font: 'bold 12px Arial, sans-serif',
                     fill: new ol.style.Fill({ color: '#222222' }),
                     stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 }),
-                    placement: 'line', // Acompanha o traçado da rua
+                    placement: 'line',
                     overflow: true
                 })
             })
@@ -380,7 +473,7 @@
         minWidth: 140
     });
 
-    // 7. Mapa e Visão (Permite Rotação Livre)
+    // 7. Mapa e Visão
     const view = new ol.View({
         center: ol.proj.fromLonLat([-55, -30]),
         zoom: 5,
@@ -390,39 +483,25 @@
     const map = new ol.Map({
         target: 'map',
         controls: ol.control.defaults.defaults().extend([scaleLineControl]),
-        layers: [
-            osmLayer, 
-            ortofotoLayer, 
-            perimetroLayer, 
-            lotesLayer, 
-            edificacoesLayer, 
-            viarioLayer, 
-            measureLayer
-        ],
+        layers: [osmLayer, ortofotoLayer, perimetroLayer, lotesLayer, edificacoesLayer, viarioLayer, measureLayer],
         overlays: [overlay],
         view: view
     });
 
-    // Auto-fit nos lotes assim que carregados
+    // Auto-fit nos lotes
     lotesSource.on('change', function () {
         if (lotesSource.getState() === 'ready' && lotesSource.getFeatures().length > 0) {
             map.getView().fit(lotesSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
         }
     });
 
-    // 8. Rotação Dinâmica da Seta Norte e Reset de Orientação
+    // 8. Rotação Dinâmica da Seta Norte
     const northBtn = document.getElementById('btn-north');
-
     view.on('change:rotation', function () {
-        const rotationRad = view.getRotation();
-        northBtn.style.transform = `rotate(${rotationRad}rad)`;
+        northBtn.style.transform = `rotate(${view.getRotation()}rad)`;
     });
-
     northBtn.onclick = function () {
-        view.animate({
-            rotation: 0,
-            duration: 350
-        });
+        view.animate({ rotation: 0, duration: 350 });
     };
 
     // 9. Controle de Expansão/Recolhimento do Menu
@@ -432,39 +511,95 @@
 
     menuToggleBtn.onclick = function () {
         mapMenu.classList.toggle('collapsed');
-        if (mapMenu.classList.contains('collapsed')) {
-            toggleIcon.textContent = '▲';
-        } else {
-            toggleIcon.textContent = '▼';
-        }
+        toggleIcon.textContent = mapMenu.classList.contains('collapsed') ? '▲' : '▼';
     };
 
-    // 10. Alternância de Camadas e Medições
-    document.getElementById('chk-perimetro').addEventListener('change', function (e) {
-        perimetroLayer.setVisible(e.target.checked);
-    });
-
-    document.getElementById('chk-lotes').addEventListener('change', function (e) {
+    // 10. Alternância de Visibilidade das Camadas
+    document.getElementById('chk-perimetro').addEventListener('change', e => perimetroLayer.setVisible(e.target.checked));
+    document.getElementById('chk-lotes').addEventListener('change', e => {
         lotesLayer.setVisible(e.target.checked);
         if (!e.target.checked) overlay.setPosition(undefined);
     });
-
-    document.getElementById('chk-edificacoes').addEventListener('change', function (e) {
-        edificacoesLayer.setVisible(e.target.checked);
-    });
-
-    document.getElementById('chk-viario').addEventListener('change', function (e) {
-        viarioLayer.setVisible(e.target.checked);
-    });
+    document.getElementById('chk-edificacoes').addEventListener('change', e => edificacoesLayer.setVisible(e.target.checked));
+    document.getElementById('chk-viario').addEventListener('change', e => viarioLayer.setVisible(e.target.checked));
 
     document.querySelectorAll('input[name="baseMap"]').forEach(elem => {
-        elem.addEventListener('change', function (e) {
+        elem.addEventListener('change', e => {
             osmLayer.setVisible(e.target.value === 'osm');
             ortofotoLayer.setVisible(e.target.value === 'ortofoto');
         });
     });
 
-    // Identificação de feições via clique
+    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP) - CORRIGIDA
+    function downloadShapefile(source, layerName) {
+        const features = source.getFeatures();
+        if (features.length === 0) {
+            alert('A camada ainda não possui feições carregadas.');
+            return;
+        }
+
+        // Exportar em coordenadas SIRGAS 2000 (EPSG:4674)
+        const format = new ol.format.GeoJSON({
+            dataProjection: 'EPSG:4674',
+            featureProjection: 'EPSG:3857'
+        });
+
+        const geojsonObject = format.writeFeaturesObject(features);
+
+        const options = {
+            folder: layerName,
+            types: {
+                point: layerName + '_pontos',
+                polygon: layerName,
+                line: layerName + '_linhas'
+            }
+        };
+
+        try {
+            // Gerar o ZIP do Shapefile via shpwrite
+            shpwrite.zip(geojsonObject, options).then(function(content) {
+                let blob;
+                // Converte Base64 para ArrayBuffer binário de modo que o WinRAR reconheça o ZIP
+                if (typeof content === 'string') {
+                    const byteCharacters = atob(content);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    blob = new Blob([byteArray], { type: 'application/zip' });
+                } else {
+                    blob = new Blob([content], { type: 'application/zip' });
+                }
+
+                // Disparar o download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = layerName + '.zip';
+                document.body.appendChild(a);
+                a.click();
+
+                // Limpeza de memória
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }).catch(function(err) {
+                console.error('Erro ao gerar Shapefile:', err);
+                alert('Ocorreu um erro ao converter a camada para Shapefile.');
+            });
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao processar os dados vetoriais.');
+        }
+    }
+
+    // Eventos de clique nos botões "SHP ⬇"
+    document.getElementById('dl-perimetro').onclick = () => downloadShapefile(perimetroSource, 'PERIMETRO_NUCLEO');
+    document.getElementById('dl-lotes').onclick = () => downloadShapefile(lotesSource, 'PRELIMINAR_LOTES');
+    document.getElementById('dl-edificacoes').onclick = () => downloadShapefile(edificacoesSource, 'EDIFICACOES');
+    document.getElementById('dl-viario').onclick = () => downloadShapefile(viarioSource, 'SISTEMA_VIARIO');
+
+    // 12. Identificação de feições via clique (Popup)
     map.on('singleclick', function (evt) {
         if (draw) return;
 
@@ -490,7 +625,7 @@
         }
     });
 
-    // Ferramenta de Desenho/Medição
+    // 13. Ferramenta de Desenho/Medição
     let draw;
 
     function addInteraction(type) {
