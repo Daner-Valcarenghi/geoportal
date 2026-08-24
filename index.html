@@ -14,49 +14,71 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
-        /* Estilo do Título (Canto Superior Esquerdo) */
+       /* --- ESTILO DO TÍTULO E AJUSTES RESPONSIVOS --- */
 .map-title {
     position: absolute;
-    top: 15px;
-    left: 60px; /* Espaço para não cobrir os botões de zoom (+ / -) do OpenLayers */
-    z-index: 1000;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 10px 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    top: 10px;
+    left: 50px;
+    z-index: 999;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 6px 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
     border: 1px solid #cccccc;
-    pointer-events: none; /* Garante que o clique passe para o mapa se clicar na caixa */
+    pointer-events: none;
+    max-width: calc(100% - 220px);
 }
 
 .map-title h1 {
     margin: 0;
-    font-size: 18px;
+    font-size: 15px;
     font-weight: bold;
     color: #1a252f;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .map-title h2 {
-    margin: 2px 0 0 0;
-    font-size: 12px;
+    margin: 1px 0 0 0;
+    font-size: 11px;
     font-weight: normal;
     color: #555555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-        html, body { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%; 
-            height: 100%; 
-            font-family: Arial, sans-serif; 
-            overflow: hidden;
-        }
 
-        #map { 
-            width: 100%; 
-            height: 100%; 
-        }
+/* Posicionamento dos Botões de Zoom no Desktop */
+.ol-zoom {
+    top: 10px !important;
+    left: 10px !important;
+}
 
+/* --- REGRAS EXCLUSIVAS PARA CELULAR (Mobile) --- */
+@media (max-width: 600px) {
+    .map-title {
+        left: 10px;
+        top: 10px;
+        padding: 4px 8px;
+        max-width: 170px; /* Garante que o título não invada o botão do menu */
+    }
+
+    .map-title h1 {
+        font-size: 12px;
+    }
+
+    .map-title h2 {
+        font-size: 9px;
+    }
+
+    /* Reposiciona o Zoom (+ / -) para ficar abaixo do título no celular */
+    .ol-zoom {
+        top: 60px !important;
+        left: 10px !important;
+    }
+}
         /* Estilo do Popup */
         .ol-popup {
             position: absolute;
