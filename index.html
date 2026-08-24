@@ -14,6 +14,35 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
     <style>
+        /* Estilo do Título (Canto Superior Esquerdo) */
+.map-title {
+    position: absolute;
+    top: 15px;
+    left: 60px; /* Espaço para não cobrir os botões de zoom (+ / -) do OpenLayers */
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    border: 1px solid #cccccc;
+    pointer-events: none; /* Garante que o clique passe para o mapa se clicar na caixa */
+}
+
+.map-title h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: bold;
+    color: #1a252f;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.map-title h2 {
+    margin: 2px 0 0 0;
+    font-size: 12px;
+    font-weight: normal;
+    color: #555555;
+}
         html, body { 
             margin: 0; 
             padding: 0; 
