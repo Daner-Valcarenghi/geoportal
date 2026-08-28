@@ -232,6 +232,28 @@
         }
         .measure-btn:hover { background: #0056b3; }
 
+        /* Botão de GPS / Localização */
+        .location-btn {
+            position: absolute;
+            bottom: 80px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .location-btn:hover { background: #ffffff; }
+
         /* Seta Norte */
         .north-arrow-btn {
             position: absolute;
@@ -280,10 +302,13 @@
     <div id="popup-content"></div>
 </div>
 
+<!-- Botão de GPS / Localização -->
+<button id="btn-location" class="location-btn" title="Minha Localização">🎯</button>
+
 <!-- Botão da Seta Norte -->
 <button id="btn-north" class="north-arrow-btn" title="Clique para reorientar para o Norte">N ↑</button>
 
-<!-- Gerenciador de Camadas e Medição (Recolhível com Downloads SHP) -->
+<!-- Gerenciador de Camadas e Medição -->
 <div class="map-menu-container">
     <button id="btn-toggle-menu" class="menu-toggle-btn">
         <span>Camadas & Ferramentas</span>
@@ -448,7 +473,30 @@
         })
     });
 
-    // 5. Popup Overlay
+    // 5. Camada de Geolocalização (GPS)
+    const positionFeature = new ol.Feature();
+    positionFeature.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+            radius: 8,
+            fill: new ol.style.Fill({ color: '#007bff' }),
+            stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 })
+        })
+    }));
+
+    const accuracyFeature = new ol.Feature();
+    accuracyFeature.setStyle(new ol.style.Style({
+        fill: new ol.style.Fill({ color: 'rgba(0, 123, 255, 0.15)' }),
+        stroke: new ol.style.Stroke({ color: 'rgba(0, 123, 255, 0.4)', width: 1 })
+    }));
+
+    const locationSource = new ol.source.Vector({
+        features: [accuracyFeature, positionFeature]
+    });
+    const locationLayer = new ol.layer.Vector({
+        source: locationSource
+    });
+
+    // 6. Popup Overlay
     const popupContainer = document.getElementById('popup');
     const popupContent = document.getElementById('popup-content');
     const popupCloser = document.getElementById('popup-closer');
@@ -464,7 +512,7 @@
         return false;
     };
 
-    // 6. Barra de Escala
+    // 7. Barra de Escala
     const scaleLineControl = new ol.control.ScaleLine({
         units: 'metric',
         bar: true,
@@ -473,7 +521,7 @@
         minWidth: 140
     });
 
-    // 7. Mapa e Visão
+    // 8. Mapa e Visão
     const view = new ol.View({
         center: ol.proj.fromLonLat([-55, -30]),
         zoom: 5,
@@ -483,7 +531,7 @@
     const map = new ol.Map({
         target: 'map',
         controls: ol.control.defaults.defaults().extend([scaleLineControl]),
-        layers: [osmLayer, ortofotoLayer, perimetroLayer, lotesLayer, edificacoesLayer, viarioLayer, measureLayer],
+        layers: [osmLayer, ortofotoLayer, perimetroLayer, lotesLayer, edificacoesLayer, viarioLayer, measureLayer, locationLayer],
         overlays: [overlay],
         view: view
     });
@@ -495,7 +543,53 @@
         }
     });
 
-    // 8. Rotação Dinâmica da Seta Norte
+    // 9. Geolocalização por GPS
+    const geolocation = new ol.Geolocation({
+        trackingOptions: {
+            enableHighAccuracy: true
+        },
+        projection: view.getProjection()
+    });
+
+    geolocation.on('change:accuracyGeometry', function () {
+        accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+    });
+
+    geolocation.on('change:position', function () {
+        const coordinates = geolocation.getPosition();
+        positionFeature.setGeometry(coordinates ? new ol.Point(coordinates) : null);
+    });
+
+    geolocation.on('error', function (error) {
+        alert('Não foi possível obter a sua localização. Verifique as permissões do seu navegador/GPS.');
+    });
+
+    const locationBtn = document.getElementById('btn-location');
+    locationBtn.onclick = function () {
+        geolocation.setTracking(true);
+        const coordinates = geolocation.getPosition();
+        if (coordinates) {
+            view.animate({
+                center: coordinates,
+                zoom: 18,
+                duration: 1000
+            });
+        } else {
+            // Caso ainda esteja buscando a primeira posição
+            geolocation.once('change:position', function () {
+                const pos = geolocation.getPosition();
+                if (pos) {
+                    view.animate({
+                        center: pos,
+                        zoom: 18,
+                        duration: 1000
+                    });
+                }
+            });
+        }
+    };
+
+    // 10. Rotação Dinâmica da Seta Norte
     const northBtn = document.getElementById('btn-north');
     view.on('change:rotation', function () {
         northBtn.style.transform = `rotate(${view.getRotation()}rad)`;
@@ -504,7 +598,7 @@
         view.animate({ rotation: 0, duration: 350 });
     };
 
-    // 9. Controle de Expansão/Recolhimento do Menu
+    // 11. Controle de Expansão/Recolhimento do Menu
     const menuToggleBtn = document.getElementById('btn-toggle-menu');
     const mapMenu = document.getElementById('map-menu');
     const toggleIcon = document.getElementById('toggle-icon');
@@ -514,7 +608,7 @@
         toggleIcon.textContent = mapMenu.classList.contains('collapsed') ? '▲' : '▼';
     };
 
-    // 10. Alternância de Visibilidade das Camadas
+    // 12. Alternância de Visibilidade das Camadas
     document.getElementById('chk-perimetro').addEventListener('change', e => perimetroLayer.setVisible(e.target.checked));
     document.getElementById('chk-lotes').addEventListener('change', e => {
         lotesLayer.setVisible(e.target.checked);
@@ -530,7 +624,7 @@
         });
     });
 
-    // 11. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP) - CORRIGIDA
+    // 13. FUNÇÃO DE EXPORTAÇÃO PARA SHAPEFILE (.ZIP)
     function downloadShapefile(source, layerName) {
         const features = source.getFeatures();
         if (features.length === 0) {
@@ -538,7 +632,6 @@
             return;
         }
 
-        // Exportar em coordenadas SIRGAS 2000 (EPSG:4674)
         const format = new ol.format.GeoJSON({
             dataProjection: 'EPSG:4674',
             featureProjection: 'EPSG:3857'
@@ -556,10 +649,8 @@
         };
 
         try {
-            // Gerar o ZIP do Shapefile via shpwrite
             shpwrite.zip(geojsonObject, options).then(function(content) {
                 let blob;
-                // Converte Base64 para ArrayBuffer binário de modo que o WinRAR reconheça o ZIP
                 if (typeof content === 'string') {
                     const byteCharacters = atob(content);
                     const byteNumbers = new Array(byteCharacters.length);
@@ -572,7 +663,6 @@
                     blob = new Blob([content], { type: 'application/zip' });
                 }
 
-                // Disparar o download
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -580,7 +670,6 @@
                 document.body.appendChild(a);
                 a.click();
 
-                // Limpeza de memória
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }).catch(function(err) {
@@ -599,7 +688,7 @@
     document.getElementById('dl-edificacoes').onclick = () => downloadShapefile(edificacoesSource, 'EDIFICACOES');
     document.getElementById('dl-viario').onclick = () => downloadShapefile(viarioSource, 'SISTEMA_VIARIO');
 
-    // 12. Identificação de feições via clique (Popup)
+    // 14. Identificação de feições via clique (Popup)
     map.on('singleclick', function (evt) {
         if (draw) return;
 
@@ -625,7 +714,7 @@
         }
     });
 
-    // 13. Ferramenta de Desenho/Medição
+    // 15. Ferramenta de Desenho/Medição
     let draw;
 
     function addInteraction(type) {
